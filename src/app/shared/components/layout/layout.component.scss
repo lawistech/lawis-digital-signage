@@ -1,0 +1,51 @@
+:host {
+  display: block;
+  height: 100vh;
+}
+
+.material-icons {
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+// Custom scrollbar for the sidebar
+nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 2px;
+  }
+}
+
+// Active route styling
+.active-nav-link {
+  background-color: rgb(239, 246, 255);
+  position: relative;
+
+  &:hover {
+    background-color: rgb(239, 246, 255);
+  }
+
+  &::before {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background-color: rgb(37, 99, 235);
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+  }
+}

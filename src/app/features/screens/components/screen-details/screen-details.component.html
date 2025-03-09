@@ -1,0 +1,169 @@
+<div class="min-h-screen bg-gray-50">
+  @if (loading) {
+    <div class="flex justify-center items-center min-h-screen">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+  } @else if (error) {
+    <div class="flex flex-col items-center justify-center min-h-screen">
+      <span class="material-icons text-4xl text-gray-400 mb-2">error_outline</span>
+      <h2 class="text-lg font-medium text-gray-900 mb-1">Error Loading Screen</h2>
+      <p class="text-gray-500 mb-4">{{ error }}</p>
+      <button 
+        (click)="retryLoading()" 
+        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+      >
+        Try Again
+      </button>
+    </div>
+  } @else if (screen) {
+    <app-screen-status-header [screen]="screen" />
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="grid grid-cols-3 gap-6">
+        <div class="col-span-2 space-y-6">
+          <app-current-playlist-card
+            [screenId]="screen.id || ''"
+            [currentPlaylistId]="screen.current_playlist"
+            (onView)="viewPlaylistDetails($event)"
+            (onPlayStatusChange)="openAssignPlaylistDialog()"
+          />
+
+          <div class="bg-white rounded-lg shadow overflow-hidden">
+            @if (showAddSchedule) {
+              <app-add-schedule-form
+                (onSubmit)="handleAddSchedule($event)"
+                (onCancel)="showAddSchedule = false"
+              />
+            }
+
+            <app-schedule-card
+              [schedules]="screen.schedule?.upcoming || []"
+              (onAddSchedule)="showAddSchedule = true"
+              (onEditSchedule)="editSchedule($event)"
+              (onDeleteSchedule)="deleteSchedule($event)"
+            />
+
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <app-screen-info-card [screen]="screen" />
+        </div>
+      </div>
+    </main>
+  } @else {
+    <div class="flex flex-col items-center justify-center min-h-screen">
+      <span class="material-icons text-4xl text-gray-400 mb-2">screen_search_desktop</span>
+      <h2 class="text-lg font-medium text-gray-900 mb-1">Screen not found</h2>
+      <p class="text-gray-500">The screen you're looking for doesn't exist or has been removed.</p>
+    </div>
+  }
+</div>
+
+@if (showPlaylistDetails && screen && screen.current_playlist) {
+  <app-playlist-details-dialog
+    [playlistId]="screen.current_playlist"
+    (onClose)="showPlaylistDetails = false"
+  />
+}
+
+@if (showPreviewDialog && selectedPlaylist) {
+  <app-playlist-preview-dialog
+    [playlist]="selectedPlaylist"
+    (closeDialog)="closePreviewDialog()"
+  />
+}
+
+<!-- Edit Schedule Dialog -->
+@if (showEditSchedule && editingSchedule) {
+  <div class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
+      <!-- Dialog Header -->
+      <div class="flex justify-between items-center p-6 border-b">
+        <h2 class="text-xl font-semibold">Edit Schedule</h2>
+        <button 
+          (click)="showEditSchedule = false; editingSchedule = null"
+          class="text-gray-400 hover:text-gray-600"
+        >
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <!-- Dialog Content -->
+      <div class="p-6">
+        <app-add-schedule-form
+          [editMode]="true"
+          [initialSchedule]="editingSchedule"
+          (onSubmit)="handleUpdateSchedule($event)"
+          (onCancel)="showEditSchedule = false; editingSchedule = null"
+        />
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Add this after your other dialogs -->
+
+<!-- Delete Confirmation Dialog -->
+@if (showDeleteConfirm && scheduleToDelete) {
+  <div class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+      <!-- Dialog Header -->
+      <div class="flex justify-between items-center p-6 border-b">
+        <h2 class="text-xl font-semibold text-gray-900">Delete Schedule</h2>
+        <button 
+          (click)="confirmDelete()"
+          class="text-gray-400 hover:text-gray-600"
+        >
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+
+      <!-- Dialog Content -->
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4 text-red-600">
+          <span class="material-icons text-3xl">warning</span>
+          <p class="text-lg font-medium">Are you sure?</p>
+        </div>
+        <p class="text-gray-600 mb-4">
+          This schedule will be permanently deleted. If it's currently active, the playlist will stop playing.
+        </p>
+
+        <!-- Schedule Details -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <span class="material-icons text-gray-400">schedule</span>
+              <span class="text-sm text-gray-600">
+                {{ scheduleToDelete.start_time }} - {{ scheduleToDelete.end_time }}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="material-icons text-gray-400">playlist_play</span>
+              <span class="text-sm text-gray-600">
+                Playlist ID: {{ scheduleToDelete.playlist_id }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dialog Actions -->
+        <div class="flex justify-end gap-3 mt-6">
+          <button
+            (click)="cancelDelete()"
+            class="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            (click)="confirmDelete()"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+          >
+            <span class="material-icons text-sm">delete</span>
+            Delete Schedule
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

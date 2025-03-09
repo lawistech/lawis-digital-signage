@@ -1,0 +1,85 @@
+
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    @for (item of media; track item.id) {
+      <div 
+        class="group relative bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all duration-300"
+      >
+        <!-- Thumbnail -->
+        <div class="aspect-video bg-gray-100 relative">
+          @if (item.type === 'image') {
+            <img
+              [src]="item.url"
+              [alt]="item.name"
+              class="w-full h-full object-cover"
+              loading="lazy"
+            />
+          } @else {
+            <div class="w-full h-full flex items-center justify-center">
+              @if (item.thumbnail_url) {
+                <img
+                  [src]="item.thumbnail_url"
+                  [alt]="item.name"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              } @else {
+                <span class="material-icons text-4xl text-gray-400">movie</span>
+              }
+              @if (item.duration) {
+                <div class="absolute bottom-2 right-2 px-2 py-1 bg-black/70 rounded text-white text-xs">
+                  {{ formatDuration(item.duration) }}
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Overlay Actions -->
+          <div
+            class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4"
+          >
+            <button
+              (click)="select.emit(item)"
+              class="p-2 bg-white rounded-full hover:bg-gray-100 transform transition-all duration-300 hover:scale-110"
+            >
+              <span class="material-icons text-blue-600">
+                {{ item.type === 'image' ? 'zoom_in' : 'play_arrow' }}
+              </span>
+            </button>
+            <button
+              (click)="delete.emit(item.id)"
+              class="p-2 bg-white rounded-full hover:bg-gray-100 transform transition-all duration-300 hover:scale-110"
+            >
+              <span class="material-icons text-red-600">delete</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Info -->
+        <div class="p-4">
+          <h3 class="font-medium truncate" [title]="item.name">{{ item.name }}</h3>
+          <div class="flex items-center justify-between mt-1">
+            <p class="text-sm text-gray-500">
+              {{ formatFileSize(item.metadata.size) }}
+            </p>
+            <p class="text-xs text-gray-400">
+              {{ item.created_at | date:'MMM d, y' }}
+            </p>
+          </div>
+          @if (item.tags.length) {
+            <div class="mt-2 flex flex-wrap gap-1">
+              @for (tag of item.tags.slice(0, 2); track tag) {
+                <span class="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
+                  {{ tag }}
+                </span>
+              }
+              @if (item.tags.length > 2) {
+                <span class="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
+                  +{{ item.tags.length - 2 }}
+                </span>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>

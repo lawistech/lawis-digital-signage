@@ -1,0 +1,289 @@
+<div class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4">
+    <!-- Header with Progress -->
+    <div class="border-b border-gray-100 px-6 py-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-gray-900">{{ steps[currentStep].title }}</h2>
+        <button (click)="onCancel.emit()" class="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <span class="material-icons text-gray-500">close</span>
+        </button>
+      </div>
+
+      <!-- Progress Steps -->
+      <div class="flex gap-2">
+        @for (step of steps; track $index) {
+          <div class="flex-1">
+            <div class="flex items-center">
+              <div
+                class="w-8 h-8 rounded-full flex items-center justify-center"
+                [ngClass]="{
+                  'bg-green-500 text-white': $index < currentStep,
+                  'bg-blue-500 text-white': $index === currentStep,
+                  'bg-gray-100 text-gray-400': $index > currentStep
+                }"
+              >
+                @if ($index < currentStep) {
+                  <span class="material-icons text-sm">check</span>
+                } @else {
+                  {{ $index + 1 }}
+                }
+              </div>
+              @if ($index < steps.length - 1) {
+                <div
+                  class="h-0.5 flex-1 mx-2"
+                  [ngClass]="{
+                    'bg-green-500': $index < currentStep,
+                    'bg-gray-200': $index >= currentStep
+                  }"
+                ></div>
+              }
+            </div>
+            <p class="text-sm mt-2 text-gray-600">{{ step.description }}</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="p-6">
+      <!-- Step 1: Code Entry -->
+      @if (currentStep === 0) {
+        <div class="max-w-md mx-auto">
+          <div class="text-center mb-8">
+            <div class="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span class="material-icons text-4xl text-blue-500">tv</span>
+            </div>
+            <p class="text-gray-600">Enter the 6-digit code displayed on your screen</p>
+          </div>
+
+          <form [formGroup]="codeForm" (ngSubmit)="verifyCode()" class="space-y-6">
+            <input
+              type="text"
+              formControlName="code"
+              maxlength="6"
+              class="w-full text-center text-3xl tracking-[0.5em] py-4 rounded-lg border focus:ring-2 transition-all"
+              [ngClass]="getInputClass(codeForm, 'code')"
+              placeholder="000000"
+            />
+
+            @if (shouldShowError(codeForm, 'code')) {
+              <p class="text-sm text-red-500">Please enter a valid 6-digit code</p>
+            }
+
+            @if (errorMessage) {
+              <div class="bg-red-50 p-3 rounded-lg text-sm text-red-600 mb-3">
+                {{ errorMessage }}
+              </div>
+            }
+
+            <button
+              type="submit"
+              [disabled]="!codeForm.valid || isVerifying"
+              class="w-full py-3 bg-blue-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+            >
+              @if (isVerifying) {
+                <span class="flex items-center justify-center">
+                  <span class="material-icons animate-spin mr-2">refresh</span>
+                  Verifying...
+                </span>
+              } @else {
+                Continue
+              }
+            </button>
+          </form>
+        </div>
+      }
+
+      <!-- Step 2: Device Details -->
+      @if (currentStep === 1) {
+        <div class="space-y-6">
+          <form [formGroup]="screenForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Screen Name</label>
+              <input
+                type="text"
+                formControlName="name"
+                class="w-full p-2.5 rounded-lg border focus:ring-2 transition-all"
+                placeholder="Enter screen name"
+              />
+              @if (shouldShowError(screenForm, 'name')) {
+                <p class="text-sm text-red-500 mt-1">Screen name is required</p>
+              }
+            </div>
+            
+            <!-- Area Selection with Add New Area option -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label for="areaSelect" class="block text-sm font-medium text-gray-700">Area</label>
+                <button
+                  type="button"
+                  (click)="toggleAreaForm()"
+                  class="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                >
+                  <span class="material-icons text-sm mr-1">add_circle</span>
+                  Add New Area
+                </button>
+              </div>
+              
+              <!-- Direct selection without conditions blocking the dropdown -->
+              <select
+                id="areaSelect"
+                formControlName="area_id"
+                class="w-full p-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+              >
+                <option value="" disabled selected>Select an area</option>
+                @for (area of areas; track area.id) {
+                  <option [value]="area.id">{{ area.name }} ({{ area.location }})</option>
+                }
+              </select>
+              
+              @if (shouldShowError(screenForm, 'area_id')) {
+                <p class="text-sm text-red-500 mt-1">Please select an area</p>
+              }
+              
+              <!-- No areas message (shown below dropdown, not replacing it) -->
+              @if (areas.length === 0 && !isLoading) {
+                <div class="mt-2 text-amber-600 text-sm">
+                  No areas available. Please add a new area.
+                </div>
+              }
+              
+              <!-- Area Creation Form -->
+              @if (showAreaForm) {
+                <div class="mt-4 bg-blue-50 p-4 rounded-lg">
+                  <h4 class="font-medium text-blue-800 mb-3">Add New Area</h4>
+                  <div class="space-y-3">
+                    <div>
+                      <label class="block text-sm text-gray-700 mb-1">Area Name*</label>
+                      <input
+                        type="text"
+                        name="areaName"
+                        [(ngModel)]="areaName"
+                        [ngModelOptions]="{standalone: true}"
+                        class="w-full p-2 border border-gray-300 rounded-lg"
+                        placeholder="Enter area name"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-sm text-gray-700 mb-1">Location*</label>
+                      <input
+                        type="text"
+                        name="areaLocation"
+                        [(ngModel)]="areaLocation"
+                        [ngModelOptions]="{standalone: true}"
+                        class="w-full p-2 border border-gray-300 rounded-lg"
+                        placeholder="Enter area location"
+                      />
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        (click)="showAreaForm = false"
+                        class="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        (click)="createNewArea()"
+                        [disabled]="!areaName || !areaLocation || isLoading"
+                        class="px-3 py-1.5 bg-blue-600 text-white rounded"
+                      >
+                        Create Area
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Orientation</label>
+              <select
+                formControlName="orientation"
+                class="w-full p-2.5 rounded-lg border focus:ring-2 transition-all cursor-pointer"
+              >
+                <option value="landscape">Landscape</option>
+                <option value="portrait">Portrait</option>
+              </select>
+            </div>
+          </form>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button
+              (click)="currentStep = 0"
+              class="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              Back
+            </button>
+            <button
+              (click)="goToReview()"
+              [disabled]="!screenForm.valid"
+              class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      }
+
+      <!-- Step 3: Review -->
+      @if (currentStep === 2) {
+        <div class="space-y-6">
+          <div class="bg-gray-50 rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Review Configuration</h3>
+            <dl class="grid grid-cols-2 gap-4">
+              <div>
+                <dt class="text-sm text-gray-500">Screen Name</dt>
+                <dd class="text-sm font-medium text-gray-900">{{ screenForm.value.name }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-gray-500">Area</dt>
+                <dd class="text-sm font-medium text-gray-900">
+                  {{ getAreaName(screenForm.value.area_id) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-gray-500">Orientation</dt>
+                <dd class="text-sm font-medium text-gray-900">
+                  {{ screenForm.value.orientation.charAt(0).toUpperCase() + screenForm.value.orientation.slice(1) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-gray-500">Resolution</dt>
+                <dd class="text-sm font-medium text-gray-900">
+                  {{ detectedDevice?.resolution || '1920x1080' }}
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          @if (errorMessage) {
+            <div class="bg-red-50 p-4 rounded-lg text-sm text-red-600">
+              {{ errorMessage }}
+            </div>
+          }
+
+          <div class="flex justify-end space-x-3">
+            <button
+              (click)="currentStep = 1"
+              class="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              Back
+            </button>
+            <button
+              (click)="handleSubmit()"
+              [disabled]="isSubmitting"
+              class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center disabled:opacity-50"
+            >
+              @if (isSubmitting) {
+                <span class="material-icons animate-spin text-sm mr-2">refresh</span>
+              }
+              {{ isSubmitting ? 'Creating...' : 'Create Screen' }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

@@ -1,0 +1,119 @@
+<!-- playlists.component.html -->
+<div class="min-h-screen bg-gray-50">
+  <!-- Header -->
+  <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6 mb-6">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-900">Playlists</h1>
+        <p class="mt-1 text-sm text-gray-500">Create and manage your content playlists</p>
+      </div>
+
+      <div class="flex flex-col sm:flex-row w-full md:w-auto gap-3">
+        <div class="relative flex-grow sm:max-w-xs">
+          <input
+            type="text"
+            [(ngModel)]="searchQuery"
+            placeholder="Search playlists..."
+            class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-200 transition-colors"
+          />
+          <span class="material-icons absolute left-3 top-2.5 text-gray-400 text-sm">search</span>
+        </div>
+
+        <button
+          (click)="createPlaylist()"
+          class="flex items-center justify-center px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium shadow-lg"
+        >
+          <span class="material-icons text-sm mr-2">add</span>
+          Create Playlist
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Skeleton -->
+  @if (loading) {
+    <div class="max-w-7xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (item of [1,2,3,4,5,6]; track item) {
+          <div class="bg-white rounded-xl shadow animate-pulse">
+            <!-- Thumbnail Skeleton -->
+            <div class="h-48 bg-gray-200 rounded-t-xl"></div>
+            
+            <!-- Content Skeleton -->
+            <div class="p-5 space-y-4">
+              <!-- Title Skeleton -->
+              <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+              
+              <!-- Stats Skeleton -->
+              <div class="grid grid-cols-2 gap-3">
+                <div class="h-12 bg-gray-100 rounded-lg"></div>
+                <div class="h-12 bg-gray-100 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Error State -->
+  @if (error) {
+    <div class="max-w-7xl mx-auto">
+      <div class="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+        <span class="material-icons text-red-500 text-4xl mb-2">error_outline</span>
+        <h3 class="text-lg font-medium text-red-800 mb-2">Failed to load playlists</h3>
+        <p class="text-red-600 mb-4">{{ error }}</p>
+        <button 
+          (click)="loadPlaylists()"
+          class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Content -->
+  @if (!loading && !error) {
+    @if (filteredPlaylists.length === 0) {
+      <div class="max-w-7xl mx-auto">
+        <div class="bg-white rounded-xl p-8 text-center">
+          <span class="material-icons text-4xl text-gray-400 mb-2">playlist_add</span>
+          <h3 class="text-lg font-medium text-gray-900 mb-1">No playlists found</h3>
+          @if (searchQuery) {
+            <p class="text-gray-500">Try adjusting your search criteria</p>
+          } @else {
+            <p class="text-gray-500">Create your first playlist to get started</p>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          @for (playlist of filteredPlaylists; track playlist.id) {
+            <app-playlist-card
+              [playlist]="playlist"
+              (preview)="previewPlaylist($event)"
+              (edit)="editPlaylist($event)"
+            />
+          }
+        </div>
+      </div>
+    }
+  }
+
+  <!-- Dialogs -->
+  @if (showCreateDialog) {
+    <app-create-playlist-dialog
+      (onCreate)="loadPlaylists()"
+      (onCancel)="showCreateDialog = false"
+    />
+  }
+
+  @if (showPreviewDialog && selectedPlaylist) {
+    <app-playlist-preview-dialog
+      [playlist]="selectedPlaylist"
+      (closeDialog)="closePreviewDialog()"
+    />
+  }
+</div>

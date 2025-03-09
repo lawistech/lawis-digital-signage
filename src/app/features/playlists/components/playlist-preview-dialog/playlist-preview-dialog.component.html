@@ -1,0 +1,62 @@
+<div
+  class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50"
+  (click)="handleBackdropClick($event)"
+>
+  <div class="relative w-full max-w-4xl bg-black rounded-lg overflow-hidden">
+    <button
+      (click)="close()"
+      class="absolute top-4 right-4 z-10 p-2 text-white/70 hover:text-white bg-black/50 rounded-full"
+    >
+      <span class="material-icons">close</span>
+    </button>
+
+    <div class="aspect-video relative">
+      @if (currentItem) { @switch (currentItem.type) { @case ('image') {
+      <img
+        [src]="currentItem.content.url"
+        [alt]="currentItem.name"
+        [class]="getScalingClass(currentItem.settings.scaling)"
+        [class.fade-in]="isTransitioning"
+      />
+      } @case ('video') {
+      <video
+        #videoPlayer
+        [src]="currentItem.content.url"
+        [muted]="currentItem.settings.muted ?? true"
+        [loop]="currentItem.settings.loop ?? false"
+        [class]="getScalingClass(currentItem.settings.scaling)"
+        (ended)="onVideoEnded()"
+        class="w-full h-full object-contain"
+      ></video>
+      } @case ('webpage') {
+      <iframe
+        [src]="getSafeUrl(currentItem.content.url)"
+        class="w-full h-full border-0"
+      ></iframe>
+      } @case ('ticker') {
+      <div class="w-full h-full flex items-center justify-center text-white">
+        <div class="ticker-content">{{ currentItem.content.url }}</div>
+      </div>
+      } } } @if (currentItem?.settings?.transition !== 'none') {
+      <div
+        class="absolute inset-0 bg-black transition-opacity duration-500"
+        [class.opacity-0]="!isTransitioning"
+        [class.opacity-100]="isTransitioning"
+      ></div>
+      }
+    </div>
+
+    <div class="absolute bottom-0 left-0 right-0 bg-black/50 p-4">
+      <div class="flex items-center justify-between text-white/70 text-sm mb-2">
+        <span>{{ currentItem?.name }}</span>
+        <span>{{ currentIndex + 1 }} / {{ playlist.items.length }}</span>
+      </div>
+      <div class="h-1 bg-white/20 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-blue-500 transition-all duration-100"
+          [style.width.%]="progress"
+        ></div>
+      </div>
+    </div>
+  </div>
+</div>

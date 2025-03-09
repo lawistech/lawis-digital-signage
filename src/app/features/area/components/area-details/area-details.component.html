@@ -1,0 +1,297 @@
+<!-- src/app/features/areas/components/area-details/area-details.component.html -->
+<div class="min-h-screen bg-gray-50">
+  <!-- Header -->
+  <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6 mb-6">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center gap-4">
+        <button 
+          (click)="goBack()" 
+          class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <span class="material-icons">arrow_back</span>
+        </button>
+        
+        @if (loading) {
+          <div class="h-8 w-48 bg-gray-200 animate-pulse rounded"></div>
+        } @else if (area) {
+          <div>
+            <div class="flex items-center gap-2">
+              <div 
+                [class]="'w-2.5 h-2.5 rounded-full ' + getStatusColor(area.status)"
+                [title]="area.status === 'active' ? 'Active' : 'Inactive'"
+              ></div>
+              <h1 class="text-2xl font-semibold text-gray-900">{{ area.name }}</h1>
+            </div>
+            <p class="text-sm text-gray-500 mt-1">{{ area.location }}</p>
+          </div>
+        }
+      </div>
+      
+      @if (area) {
+        <div class="flex gap-3">
+          <button 
+            (click)="refreshData()" 
+            class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+            title="Refresh data"
+          >
+            <span class="material-icons">refresh</span>
+          </button>
+          
+          <button 
+            (click)="toggleAreaStatus()" 
+            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+            [class.bg-red-50]="area.status === 'active'"
+            [class.text-red-600]="area.status === 'active'"
+            [class.bg-green-50]="area.status === 'inactive'"
+            [class.text-green-600]="area.status === 'inactive'"
+          >
+            <span class="material-icons text-sm">
+              {{ area.status === 'active' ? 'pause_circle' : 'play_circle' }}
+            </span>
+            {{ area.status === 'active' ? 'Deactivate Area' : 'Activate Area' }}
+          </button>
+          
+          <button 
+            (click)="openAddScreenDialog()" 
+            class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium flex items-center gap-2"
+          >
+            <span class="material-icons text-sm">add_circle</span>
+            Add Screen
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Error Banner -->
+  @if (error) {
+    <div class="max-w-7xl mx-auto mb-6">
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between text-red-700">
+        <div class="flex items-center">
+          <span class="material-icons mr-2">error</span>
+          {{ error }}
+        </div>
+        <button 
+          (click)="error = null" 
+          class="text-red-500 hover:text-red-700"
+        >
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Loading Skeleton -->
+  @if (loading) {
+    <div class="max-w-7xl mx-auto">
+      <!-- Stats Skeleton -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="bg-white rounded-xl p-6 shadow-sm animate-pulse">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-lg bg-gray-200"></div>
+              <div class="space-y-2">
+                <div class="h-4 w-24 bg-gray-200 rounded"></div>
+                <div class="h-6 w-12 bg-gray-300 rounded"></div>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+      
+      <!-- Screens Skeleton -->
+      <div class="bg-white rounded-xl p-6 mb-6">
+        <div class="h-6 w-32 bg-gray-200 rounded mb-4"></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          @for (i of [1, 2, 3]; track i) {
+            <div class="bg-gray-100 rounded-lg h-40 animate-pulse"></div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Main Content -->
+  @if (!loading && area) {
+    <!-- Stats Overview -->
+    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <!-- Total Screens -->
+      <div class="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-4">
+          <div class="p-3 bg-blue-50 rounded-lg">
+            <span class="material-icons text-blue-600">devices</span>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Total Screens</p>
+            <p class="text-2xl font-semibold">{{ stats.total }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Online Screens -->
+      <div class="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-4">
+          <div class="p-3 bg-green-50 rounded-lg">
+            <span class="material-icons text-green-600">wifi</span>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Online</p>
+            <p class="text-2xl font-semibold">{{ stats.online }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Offline Screens -->
+      <div class="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-4">
+          <div class="p-3 bg-gray-50 rounded-lg">
+            <span class="material-icons text-gray-600">wifi_off</span>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Offline</p>
+            <p class="text-2xl font-semibold">{{ stats.offline }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Maintenance -->
+      <div class="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-4">
+          <div class="p-3 bg-amber-50 rounded-lg">
+            <span class="material-icons text-amber-600">build</span>
+          </div>
+          <div>
+            <p class="text-sm text-gray-500">Maintenance</p>
+            <p class="text-2xl font-semibold">{{ stats.maintenance }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Area Description -->
+    @if (area.description) {
+      <div class="max-w-7xl mx-auto mb-6">
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h2 class="text-lg font-medium text-gray-900 mb-2">Description</h2>
+          <p class="text-gray-600">{{ area.description }}</p>
+        </div>
+      </div>
+    }
+
+    <!-- Assigned Playlists (New section) -->
+    @if (playlists.length > 0) {
+      <div class="max-w-7xl mx-auto mb-6">
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <h2 class="text-lg font-medium text-gray-900 mb-4">Assigned Playlists</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            @for (playlist of playlists; track playlist.id) {
+              <div class="border border-gray-100 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h3 class="font-medium text-gray-800">{{ playlist.name }}</h3>
+                    <p class="text-sm text-gray-500 mt-1">{{ playlist.items.length }} items • {{ playlist.duration }} sec</p>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="px-2 py-1 rounded-full text-xs font-medium capitalize"
+                         [class.bg-emerald-100]="playlist.status === 'active'"
+                         [class.text-emerald-800]="playlist.status === 'active'"
+                         [class.bg-amber-100]="playlist.status === 'draft'"
+                         [class.text-amber-800]="playlist.status === 'draft'"
+                         [class.bg-gray-100]="playlist.status === 'archived'"
+                         [class.text-gray-800]="playlist.status === 'archived'">
+                      {{ playlist.status }}
+                    </span>
+                  </div>
+                </div>
+                @if (playlist.description) {
+                  <p class="text-sm text-gray-600 mt-2 line-clamp-2">{{ playlist.description }}</p>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Search and Filter -->
+    <div class="max-w-7xl mx-auto mb-6">
+      <div class="bg-white rounded-xl p-4 shadow-sm">
+        <div class="flex flex-col sm:flex-row items-center gap-4">
+          <!-- Search Input -->
+          <div class="relative flex-grow">
+            <input
+              type="text"
+              [(ngModel)]="searchQuery"
+              placeholder="Search screens..."
+              class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-200 transition-colors"
+            />
+            <span class="material-icons absolute left-3 top-2.5 text-gray-400 text-sm">search</span>
+          </div>
+          
+          <!-- Results Count -->
+          <div class="text-sm text-gray-500">
+            Showing {{ filteredScreens.length }} of {{ screens.length }} screens
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screens List -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-medium text-gray-900">Screens</h2>
+        
+        <!-- Only show if we have screens but none match the filter -->
+        @if (screens.length > 0 && filteredScreens.length === 0) {
+          <button
+            (click)="searchQuery = ''"
+            class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          >
+            Clear search
+          </button>
+        }
+      </div>
+      
+      @if (filteredScreens.length === 0) {
+        <div class="bg-white rounded-xl p-8 text-center">
+          <span class="material-icons text-4xl text-gray-400 mb-2">monitor</span>
+          <h3 class="text-lg font-medium text-gray-900 mb-1">
+            @if (screens.length === 0) {
+              No screens found
+            } @else {
+              No screens match your search
+            }
+          </h3>
+          <p class="text-gray-500">
+            @if (screens.length === 0) {
+              Add screens to this area to get started
+            } @else {
+              Try adjusting your search criteria
+            }
+          </p>
+        </div>
+      } @else {
+        <!-- Masonry Grid of Screens -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          @for (screen of filteredScreens; track screen.id) {
+            <app-screen-card
+              [screen]="screen"
+              (edit)="editScreen($event)"
+            
+            ></app-screen-card>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Add Screen Dialog -->
+  @if (showAddScreenDialog) {
+    <app-area-screens-dialog
+      [areaData]="{name: area?.name || '', location: area?.location || ''}"
+      [availableScreens]="screens"
+      (createArea)="closeAddScreenDialog(true)"
+      (back)="closeAddScreenDialog(false)"
+    ></app-area-screens-dialog>
+  }
+</div>

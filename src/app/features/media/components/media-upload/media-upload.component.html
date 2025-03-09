@@ -1,0 +1,67 @@
+<div class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4">
+      <div class="p-6 border-b">
+        <div class="flex justify-between items-center">
+          <h2 class="text-xl font-semibold">Upload Media</h2>
+          <button
+            (click)="cancel.emit()"
+            class="text-gray-400 hover:text-gray-600"
+            [disabled]="isUploading"
+          >
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+      </div>
+  
+      <div class="p-6">
+        <div
+          class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center transition-colors duration-200"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+          [class.opacity-50]="isUploading"
+        >
+          <span class="material-icons text-4xl text-gray-400 mb-2">cloud_upload</span>
+          <h3 class="text-lg font-medium mb-1">Drag and drop files here</h3>
+          <p class="text-sm text-gray-500 mb-4">or</p>
+          <input
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            class="hidden"
+            #fileInput
+            (change)="onFileSelected($event)"
+            [disabled]="isUploading"
+          />
+          <button
+            (click)="fileInput.click()"
+            class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            [disabled]="isUploading"
+          >
+            Browse Files
+          </button>
+        </div>
+  
+        @if (uploadProgress > 0) {
+          <div class="mt-4">
+            <div class="flex justify-between text-sm mb-1">
+              <span>Uploading...</span>
+              <span>{{ uploadProgress }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div
+                class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                [style.width.%]="uploadProgress"
+              ></div>
+            </div>
+          </div>
+        }
+  
+        @if (error) {
+          <div class="mt-4 p-4 bg-red-50 text-red-600 rounded-lg">
+            {{ error }}
+          </div>
+        }
+      </div>
+    </div>
+  </div>

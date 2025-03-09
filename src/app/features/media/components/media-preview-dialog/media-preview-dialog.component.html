@@ -1,0 +1,168 @@
+
+<div 
+class="fixed inset-0 bg-black/95 z-50 flex items-center justify-center transition-opacity duration-200"
+[class.opacity-0]="isClosing"
+[class.opacity-100]="!isClosing"
+(click)="handleBackdropClick($event)"
+>
+<!-- Loading Indicator -->
+@if (isLoading) {
+  <div class="absolute inset-0 flex items-center justify-center">
+    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+  </div>
+}
+
+<!-- Main Content Container -->
+<div 
+  class="relative max-w-[95vw] max-h-[95vh] overflow-hidden rounded-lg"
+  [class.cursor-grab]="isDraggable && !isDragging"
+  [class.cursor-grabbing]="isDragging"
+  (mousedown)="startDrag($event)"
+  (mousemove)="handleDrag($event)"
+  (mouseup)="stopDrag()"
+  (mouseleave)="stopDrag()"
+>
+  <!-- Image Preview -->
+  @if (media.type === 'image') {
+    <img
+      [src]="media.url"
+      [alt]="media.name"
+      class="max-w-full max-h-full object-contain transition-transform duration-200"
+      [class.cursor-zoom-in]="!isZoomed"
+      [class.cursor-zoom-out]="isZoomed"
+      [style.transform]="getTransform()"
+      (click)="handleContentClick($event)"
+      (wheel)="handleWheel($event)"
+      (load)="onMediaLoaded()"
+      (error)="onMediaError()"
+      draggable="false"
+    />
+  }
+
+  <!-- Video Preview -->
+  @if (media.type === 'video') {
+    <video
+      #videoPlayer
+      [src]="media.url"
+      class="max-w-full max-h-full bg-black"
+      controls
+      autoplay
+      playsinline
+      (loadedmetadata)="onMediaLoaded()"
+      (error)="onMediaError()"
+    ></video>
+  }
+
+  <!-- Toolbar -->
+  <div 
+    class="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-4 py-2 transition-opacity duration-200"
+    [class.opacity-0]="!showControls && !isHovering"
+    [class.opacity-100]="showControls || isHovering"
+  >
+    <!-- Close Button -->
+    <button
+      (click)="initiateClose()"
+      class="p-2 text-white/70 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+      title="Close (Esc)"
+    >
+      <span class="material-icons">close</span>
+    </button>
+
+    <!-- Divider -->
+    <div class="w-px h-6 bg-white/20"></div>
+
+    <!-- Image Controls -->
+    @if (media.type === 'image') {
+      <button
+        (click)="zoomOut()"
+        class="p-2 text-white/70 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+        [disabled]="scale <= 1"
+        title="Zoom Out (-)"
+      >
+        <span class="material-icons">remove</span>
+      </button>
+
+      <span class="text-white/90 min-w-[4rem] text-center text-sm">
+        {{ Math.round(scale * 100) }}%
+      </span>
+
+      <button
+        (click)="zoomIn()"
+        class="p-2 text-white/70 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+        [disabled]="scale >= maxZoom"
+        title="Zoom In (+)"
+      >
+        <span class="material-icons">add</span>
+      </button>
+
+      <div class="w-px h-6 bg-white/20"></div>
+
+      <button
+        (click)="resetView()"
+        class="p-2 text-white/70 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+        [disabled]="!isTransformed"
+        title="Reset View (R)"
+      >
+        <span class="material-icons">restart_alt</span>
+      </button>
+    }
+
+    <!-- Fullscreen Toggle -->
+    <button
+      (click)="toggleFullscreen()"
+      class="p-2 text-white/70 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+      title="Toggle Fullscreen (F)"
+    >
+      <span class="material-icons">
+        {{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}
+      </span>
+    </button>
+  </div>
+
+  <!-- Error Message -->
+  @if (hasError) {
+    <div class="absolute inset-0 flex items-center justify-center bg-black/50">
+      <div class="text-center text-white">
+        <span class="material-icons text-4xl mb-2">error_outline</span>
+        <p>Failed to load media</p>
+        <button
+          (click)="retryLoad()"
+          class="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Info Bar -->
+  <div 
+    class="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm p-4 transition-transform duration-200"
+    [class.translate-y-full]="!showControls && !isHovering"
+    (mouseenter)="isHovering = true"
+    (mouseleave)="isHovering = false"
+  >
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="text-white font-medium">{{ media.name }}</h3>
+        <p class="text-white/70 text-sm mt-1">
+          @if (media.type === 'image') {
+            @if (media.metadata.width && media.metadata.height) {
+              {{ media.metadata.width }}×{{ media.metadata.height }} •
+            }
+            {{ formatFileSize(media.metadata.size) }}
+          } @else {
+            {{ formatFileSize(media.metadata.size) }}
+          }
+        </p>
+      </div>
+      
+      @if (media.type === 'image') {
+        <p class="text-white/50 text-sm">
+          Scroll to zoom • Drag to pan • Double-click to reset
+        </p>
+      }
+    </div>
+  </div>
+</div>
+</div>

@@ -1,0 +1,109 @@
+<!-- edit-playlist-item-dialog.component.html -->
+<div class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold">Edit Content Settings</h2>
+        <button 
+          (click)="cancel.emit()"
+          class="text-gray-400 hover:text-gray-600"
+        >
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+  
+      <!-- Content -->
+      <div class="space-y-6">
+        <!-- Preview -->
+        <div class="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+          @if (item.type === 'image') {
+            <img 
+              [src]="item.content.url" 
+              [alt]="item.name"
+              class="w-full h-full object-contain"
+            />
+          } @else {
+            <div class="w-full h-full flex items-center justify-center">
+              @if (item.content.thumbnail) {
+                <img 
+                  [src]="item.content.thumbnail" 
+                  [alt]="item.name"
+                  class="w-full h-full object-cover"
+                />
+              } @else {
+                <span class="material-icons text-4xl text-gray-400">movie</span>
+              }
+            </div>
+          }
+        </div>
+  
+        <!-- Duration -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Duration (seconds)
+          </label>
+          <input
+            type="number"
+            min="1"
+            step="0.5"
+            [(ngModel)]="editedItem.duration"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+  
+        <!-- Transition -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Transition Effect
+          </label>
+          <select
+            [(ngModel)]="editedItem.settings!.transition"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="fade">Fade</option>
+            <option value="slide">Slide</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+  
+  
+        <!-- Video-specific settings -->
+        @if (item.type === 'video') {
+          <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                [(ngModel)]="editedItem.settings!.muted"
+                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span class="text-sm text-gray-700">Muted</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                [(ngModel)]="editedItem.settings!.loop"
+                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span class="text-sm text-gray-700">Loop</span>
+            </label>
+          </div>
+        }
+      </div>
+  
+      <!-- Footer -->
+      <div class="flex justify-end gap-3 mt-6 pt-6 border-t">
+        <button
+          (click)="cancel.emit()"
+          class="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+        >
+          Cancel
+        </button>
+        <button
+          (click)="handleSave()"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
