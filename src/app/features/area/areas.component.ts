@@ -1,17 +1,15 @@
-// areas.component.ts - Update this method to fix the dialog flow
-
+// areas.component.ts
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Observable, Subject, map } from 'rxjs';
+import { Observable, Subject, map, takeUntil } from 'rxjs';
 import { Area, CreateAreaDto } from '../../models/area.model';
 import { CreateAreaDialogData } from './models/area-dialog.model';
 import { Screen } from '../../models/screen.model';
 
 import { AreaCardComponent } from './components/area-card/area-card.component';
 import { AreaNameDialogComponent } from './components/dialogs/area-name-dialog.component';
-import { AreaOrientationDialogComponent } from './components/dialogs/area-orientation-dialog.component';
 import { AreaFacade } from '../../core/state/area-state/area.facade';
 import { ScreenService } from '../screens/services/screen.service';
 import { AreaScreensDialogComponent } from "./components/dialogs/area-screens-dialog.component";
@@ -45,6 +43,7 @@ export class AreasComponent implements OnInit, OnDestroy {
   showScreensDialog = false;
   tempAreaData: Partial<CreateAreaDialogData> | null = null;
   availableScreens: Screen[] = [];  
+  showWelcomeBanner = false;
 
   private destroy$ = new Subject<void>();
 
@@ -58,7 +57,7 @@ export class AreasComponent implements OnInit, OnDestroy {
     this.loadAvailableScreens();
     
     // Add some helpful feedback if no areas exist
-    this.areas$.pipe(take(1)).subscribe(areas => {
+    this.areas$.pipe(takeUntil(this.destroy$)).subscribe(areas => {
       if (areas.length === 0) {
         // Maybe display a welcome message for new users with no areas
         this.showWelcomeBanner = true;
@@ -94,36 +93,34 @@ export class AreasComponent implements OnInit, OnDestroy {
     this.showScreensDialog = true;
   }
 
-  // Update to the onCreateArea method in areas.component.ts
+  onCreateArea(data: { screenIds: string[] } & Partial<CreateAreaDialogData>): void {
+    if (!data.name || !data.location) {
+      console.error('Missing required area data');
+      return;
+    }
+    
+    // Check if screenIds is defined, if not set it to an empty array
+    const screenIds = data.screenIds || [];
+    
+    const newArea: CreateAreaDto = {
+      name: data.name,
+      description: data.description,
+      location: data.location,
+      screenIds: screenIds // Make sure this property exists in CreateAreaDto
+    };
 
-onCreateArea(data: { screenIds: string[] } & Partial<CreateAreaDialogData>): void {
-  if (!data.name || !data.location) {
-    console.error('Missing required area data');
-    return;
+    console.log('Creating area with data:', newArea);
+
+    this.areaFacade.createArea(newArea).subscribe({
+      next: () => {
+        this.closeDialogs();
+        this.loadAvailableScreens();
+      },
+      error: (error) => {
+        console.error('Error creating area:', error);
+      },
+    });
   }
-  
-  // Check if screenIds is defined, if not set it to an empty array
-  const screenIds = data.screenIds || [];
-  
-  const newArea: CreateAreaDto = {
-    name: data.name,
-    description: data.description,
-    location: data.location,
-    screenIds: screenIds // Make sure this property exists in CreateAreaDto
-  };
-
-  console.log('Creating area with data:', newArea);
-
-  this.areaFacade.createArea(newArea).subscribe({
-    next: () => {
-      this.closeDialogs();
-      this.loadAvailableScreens();
-    },
-    error: (error) => {
-      console.error('Error creating area:', error);
-    },
-  });
-}
 
   editArea(area: Area): void {
     console.log('Editing area:', area);
@@ -143,15 +140,17 @@ onCreateArea(data: { screenIds: string[] } & Partial<CreateAreaDialogData>): voi
   }
 
   // Create a filtered areas observable
-  filteredAreas$ = this.areas$.pipe(
-    map(areas => {
-      const query = this.searchQuery.toLowerCase();
-      return areas.filter(
-        (area) =>
-          area.name.toLowerCase().includes(query) ||
-          area.location.toLowerCase().includes(query) ||
-          area.description?.toLowerCase().includes(query)
-      );
-    })
-  );
+  get filteredAreas$(): Observable<Area[]> {
+    return this.areas$.pipe(
+      map(areas => {
+        const query = this.searchQuery.toLowerCase();
+        return areas.filter(
+          (area) =>
+            area.name.toLowerCase().includes(query) ||
+            area.location.toLowerCase().includes(query) ||
+            area.description?.toLowerCase().includes(query)
+        );
+      })
+    );
+  }
 }

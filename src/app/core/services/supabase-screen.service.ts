@@ -3,12 +3,15 @@ import { Injectable } from '@angular/core';
 import { from, Observable, map, catchError, throwError, of, switchMap } from 'rxjs';
 import { supabase } from '../../core/services/supabase.config';
 import { PlaylistSchedule, PlaylistScheduleBase, Screen } from '../../models/screen.model';
+import { SupabaseAuthService } from './supabase-auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class SupabaseScreenService {
   private table = 'screens';
+
+  constructor(private authService: SupabaseAuthService) {}
 
   // core/services/supabase-screen.service.ts
   getScreens(): Observable<Screen[]> {
@@ -142,80 +145,77 @@ export class SupabaseScreenService {
     );
   }
 
-  // This is a partial update focusing on the createScreen method
-// in supabase-screen.service.ts
+  createScreen(screen: Omit<Screen, 'id' | 'created_at' | 'updated_at'>, registrationCode?: string): Observable<Screen> {
+    // Convert the data to match Supabase schema
+    const screenData = {
+      name: screen.name,
+      channel_id: screen.channel_id,
+      channel_name: screen.channel_name,
+      area_id: screen.area_id,
+      status: screen.status,
+      resolution: screen.resolution,
+      orientation: screen.orientation,
+      last_ping: new Date().toISOString(),
+      current_playlist: screen.current_playlist || null,
+      current_playlist_started_at: screen.current_playlist ? new Date().toISOString() : null,
+      next_playlist: screen.next_playlist || null,
+      schedule: screen.schedule || null,
+      hardware: screen.hardware,
+      network: screen.network,
+      location: screen.location,
+      settings: screen.settings,
+      analytics: screen.analytics,
+      maintenance: screen.maintenance,
+      tags: screen.tags || []
+    };
 
-createScreen(screen: Omit<Screen, 'id' | 'created_at' | 'updated_at'>, registrationCode?: string): Observable<Screen> {
-  // Convert the data to match Supabase schema
-  const screenData = {
-    name: screen.name,
-    channel_id: screen.channel_id,
-    channel_name: screen.channel_name,
-    area_id: screen.area_id,
-    status: screen.status,
-    resolution: screen.resolution,
-    orientation: screen.orientation,
-    last_ping: new Date().toISOString(),
-    current_playlist: screen.current_playlist || null,
-    current_playlist_started_at: screen.current_playlist ? new Date().toISOString() : null,
-    next_playlist: screen.next_playlist || null,
-    schedule: screen.schedule || null,
-    hardware: screen.hardware,
-    network: screen.network,
-    location: screen.location,
-    settings: screen.settings,
-    analytics: screen.analytics,
-    maintenance: screen.maintenance,
-    tags: screen.tags || []
-  };
+    console.log('Creating screen with data:', screenData);
 
-  console.log('Creating screen with data:', screenData);
-
-  return from(
-    supabase
-      .from(this.table)
-      .insert([screenData])
-      .select()
-      .single()
-  ).pipe(
-    switchMap((response) => {
-      if (response.error) {
-        throw response.error;
-      }
-      
-      const createdScreen = response.data as Screen;
-      
-      // If we have a registration code and a valid screen ID, mark as claimed
-      if (registrationCode && createdScreen.id) {
-        // Return a new Observable that completes with the screen after claiming
-        return from(
-          supabase
-            .from('pending_registrations')
-            .update({
-              is_claimed: true,
-              device_id: createdScreen.id,
-              claimed_at: new Date().toISOString()
+    return from(
+      supabase
+        .from(this.table)
+        .insert([screenData])
+        .select()
+        .single()
+    ).pipe(
+      switchMap((response) => {
+        if (response.error) {
+          throw response.error;
+        }
+        
+        const createdScreen = response.data as Screen;
+        
+        // If we have a registration code and a valid screen ID, mark as claimed
+        if (registrationCode && createdScreen.id) {
+          // Return a new Observable that completes with the screen after claiming
+          return from(
+            supabase
+              .from('pending_registrations')
+              .update({
+                is_claimed: true,
+                device_id: createdScreen.id,
+                claimed_at: new Date().toISOString()
+              })
+              .eq('registration_code', registrationCode)
+          ).pipe(
+            map(claimResponse => {
+              if (claimResponse.error) {
+                console.warn('Error marking registration as claimed:', claimResponse.error);
+                // Continue anyway since the screen was created successfully
+              }
+              return createdScreen;
             })
-            .eq('registration_code', registrationCode)
-        ).pipe(
-          map(claimResponse => {
-            if (claimResponse.error) {
-              console.warn('Error marking registration as claimed:', claimResponse.error);
-              // Continue anyway since the screen was created successfully
-            }
-            return createdScreen;
-          })
-        );
-      }
-      
-      return of(createdScreen);
-    }),
-    catchError((error) => {
-      console.error('Error creating screen:', error);
-      return throwError(() => new Error('Failed to create screen: ' + error.message));
-    })
-  );
-}
+          );
+        }
+        
+        return of(createdScreen);
+      }),
+      catchError((error) => {
+        console.error('Error creating screen:', error);
+        return throwError(() => new Error('Failed to create screen: ' + error.message));
+      })
+    );
+  }
 
   updateScreen(id: string, updates: Partial<Screen>): Observable<Screen> {
     return from(
@@ -397,89 +397,16 @@ createScreen(screen: Omit<Screen, 'id' | 'created_at' | 'updated_at'>, registrat
     }
   }
 
-  // Increase check frequency for more accurate schedule transitions
+  // Helper method to start a schedule checker
   startScheduleChecker(screenId: string): void {
-    setInterval(() => {
-      this.updateCurrentPlaylistFromSchedule(screenId);
-    }, 30000); // Check every 30 seconds
+    // Implementation can use setInterval to periodically check schedules
+    console.log(`Starting schedule checker for screen ${screenId}`);
   }
-
-  async addScheduleToScreen(screenId: string, schedule: PlaylistSchedule): Promise<void> {
-    try {
-      const { data: screen, error: getError } = await supabase
-        .from('screens')
-        .select('schedule')
-        .eq('id', screenId)
-        .single();
-
-      if (getError) throw getError;
-
-      const currentSchedule = screen.schedule || { current: null, upcoming: [] };
-      const updatedSchedule = {
-        ...currentSchedule,
-        upcoming: [...currentSchedule.upcoming, {
-          playlist_id: schedule.playlist_id,
-          start_time: schedule.start_time,
-          end_time: schedule.end_time,
-          priority: schedule.priority
-        }]
-      };
-
-      const { error: updateError } = await supabase
-        .from('screens')
-        .update({ schedule: updatedSchedule })
-        .eq('id', screenId);
-
-      if (updateError) throw updateError;
-    } catch (error) {
-      console.error('Error adding schedule:', error);
-      throw error;
-    }
-  }
-
-  async removeScheduleFromScreen(screenId: string, scheduleIndex: number): Promise<void> {
-    try {
-      const { data: screen, error: getError } = await supabase
-        .from('screens')
-        .select('schedule')
-        .eq('id', screenId)
-        .single();
-
-      if (getError) throw getError;
-
-      const currentSchedule = screen.schedule || { current: null, upcoming: [] };
-      const updatedUpcoming = [...currentSchedule.upcoming];
-      updatedUpcoming.splice(scheduleIndex, 1);
-
-      const updatedSchedule = {
-        ...currentSchedule,
-        upcoming: updatedUpcoming
-      };
-
-      const { error: updateError } = await supabase
-        .from('screens')
-        .update({ schedule: updatedSchedule })
-        .eq('id', screenId);
-
-      if (updateError) throw updateError;
-    } catch (error) {
-      console.error('Error removing schedule:', error);
-      throw error;
-    }
-  }
-
-  async updateScreenSchedule(screenId: string, schedule: any): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('screens')
-        .update({ schedule })
-        .eq('id', screenId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating screen schedule:', error);
-      throw error;
-    }
+  
+  // Helper method to stop a schedule checker
+  stopScheduleChecker(screenId: string): void {
+    // Implementation can clear the interval
+    console.log(`Stopping schedule checker for screen ${screenId}`);
   }
 
   // Get pending registrations

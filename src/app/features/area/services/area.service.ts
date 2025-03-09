@@ -20,7 +20,6 @@ export class AreaService {
   /**
    * Get all areas with optimized caching and refresh strategy
    */
-  // features/area/services/area.service.ts
   getAreas(forceRefresh = false): Observable<Area[]> {
     // Return cached result if available and not forcing refresh
     if (this.areasCache$ && !forceRefresh) {
@@ -103,7 +102,6 @@ export class AreaService {
   /**
    * Create a new area with optimistic UI update support
    */
-  // features/area/services/area.service.ts
   createArea(areaData: CreateAreaDto): Observable<Area> {
     const userId = this.authService.getCurrentUserId();
     if (!userId) {
@@ -126,8 +124,42 @@ export class AreaService {
         lastUpdated: new Date().toISOString()
       }
     };
-    
-    // Rest of the method remains the same...
+
+    // Insert area first, then assign screens if any
+    return from(
+      supabase
+        .from('areas')
+        .insert([newArea])
+        .select()
+        .single()
+    ).pipe(
+      switchMap(({ data, error }) => {
+        if (error) throw error;
+        
+        const createdArea = this.mapAreaFromSupabase(data);
+        
+        // Clear cache to ensure fresh data
+        this.areasCache$ = null;
+        
+        // If there are any screen IDs, assign them to this area
+        if (areaData.screenIds && areaData.screenIds.length > 0) {
+          return this.assignScreensToArea(createdArea.id, areaData.screenIds).pipe(
+            map(() => createdArea),
+            catchError(assignError => {
+              console.warn('Error assigning screens to area:', assignError);
+              // Return the area anyway, even if screen assignment failed
+              return of(createdArea);
+            })
+          );
+        }
+        
+        return of(createdArea);
+      }),
+      catchError(error => {
+        console.error('Error creating area:', error);
+        return throwError(() => error);
+      })
+    );
   }
 
   /**

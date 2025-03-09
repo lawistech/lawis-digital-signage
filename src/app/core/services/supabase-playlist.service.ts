@@ -1,8 +1,9 @@
-// supabase-playlist.service.ts
+// core/services/supabase-playlist.service.ts
 import { Injectable } from '@angular/core';
 import { Observable, from, map, catchError, throwError } from 'rxjs';
 import { supabase } from './supabase.config';
 import { Playlist, CreatePlaylistDto, PlaylistItem } from '../../models/playlist.model';
+import { SupabaseAuthService } from './supabase-auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -10,6 +11,7 @@ import { Playlist, CreatePlaylistDto, PlaylistItem } from '../../models/playlist
 export class SupabasePlaylistService {
   private readonly TABLE_NAME = 'playlists';
 
+  constructor(private authService: SupabaseAuthService) {}
   
   // core/services/supabase-playlist.service.ts
   getPlaylists(): Observable<Playlist[]> {
@@ -109,7 +111,11 @@ export class SupabasePlaylistService {
 
       if (playlistError) throw playlistError;
 
-      // Rest of the method...
+      // Return the newly created playlist
+      return this.mapPlaylist(playlistData);
+    } catch (error) {
+      console.error('Error creating playlist:', error);
+      throw error;
     }
   }
 

@@ -72,8 +72,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
     if (!this.currentUser) return '';
     
     // Use user metadata if available
-    if (this.currentUser.user_metadata?.name) {
-      return this.currentUser.user_metadata.name;
+    if (this.currentUser.user_metadata && this.currentUser.user_metadata['name']) {
+      return this.currentUser.user_metadata['name'];
     }
     
     // Fall back to email

@@ -43,15 +43,16 @@
 
         <!-- Navigation -->
         <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
-          
-            *ngFor="let item of navigationItems"
-            [routerLink]="item.path"
-            routerLinkActive="bg-blue-50 text-blue-600"
-            class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <span class="material-icons mr-3">{{ item.icon }}</span>
-            {{ item.label }}
-          </a>
+          @for (item of navigationItems; track item.path) {
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="bg-blue-50 text-blue-600"
+              class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <span class="material-icons mr-3">{{ item.icon }}</span>
+              {{ item.label }}
+            </a>
+          }
         </nav>
 
         <!-- User section -->
