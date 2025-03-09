@@ -1,4 +1,3 @@
-// Enhance CurrentPlaylistCardComponent with better data handling
 import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PlaylistService } from '../../../../playlists/services/playlist.service';
@@ -56,7 +55,7 @@ import { Playlist } from '../../../../../models/playlist.model';
               </div>
             }
             <div>
-              <p class="font-medium">{{ currentItem.name }}</p>
+              <p class="font-medium">{{playlist?.name  || 'Untitled Playlist'}}</p>
               <p class="text-sm text-gray-500">{{ formatDuration(currentItem.duration || 0) }}</p>
             </div>
           </div>
@@ -77,6 +76,8 @@ export class CurrentPlaylistCardComponent implements OnInit, OnChanges {
   error: string | null = null;
   isPlaying = false;
   currentItem: any = null;
+  private cachedPlaylist: Playlist | null = null;
+  private loadCompleted = false;
 
   constructor(private playlistService: PlaylistService) {}
 
@@ -84,37 +85,53 @@ export class CurrentPlaylistCardComponent implements OnInit, OnChanges {
     if (this.currentPlaylistId) {
       this.loadPlaylist();
     } else {
-      // Clear state when no playlist is present
       this.resetState();
     }
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    // If the currentPlaylistId changes, react accordingly
-    if (changes['currentPlaylistId']) {
+    // Only reload playlist if the currentPlaylistId actually changed
+    if (changes['currentPlaylistId'] && 
+        changes['currentPlaylistId'].currentValue !== changes['currentPlaylistId'].previousValue) {
       console.log('Current playlist ID changed:', this.currentPlaylistId);
       
+      // Reset the load completed flag to ensure we get fresh data
+      this.loadCompleted = false;
+      
       if (this.currentPlaylistId) {
+        // Clear current state before loading new data
+        this.playlist = null;
+        this.currentItem = null;
+        
+        // Load the new playlist
         this.loadPlaylist();
       } else {
-        // Explicitly reset state when playlist ID is cleared
         this.resetState();
       }
     }
   }
 
-  // Helper to reset component state when no playlist is present
   private resetState() {
     this.playlist = null;
+    this.cachedPlaylist = null;
     this.currentItem = null;
     this.isPlaying = false;
     this.error = null;
+    this.loadCompleted = false;
   }
 
   loadPlaylist() {
     if (!this.currentPlaylistId) {
       this.resetState();
       return;
+    }
+
+    // If we already completed loading once and have cached data, use that first
+    if (this.loadCompleted && this.cachedPlaylist) {
+      this.playlist = this.cachedPlaylist;
+      if (this.playlist.items && this.playlist.items.length > 0) {
+        this.currentItem = this.playlist.items[0];
+      }
     }
 
     this.loading = true;
@@ -124,25 +141,41 @@ export class CurrentPlaylistCardComponent implements OnInit, OnChanges {
     this.playlistService.getPlaylist(this.currentPlaylistId).subscribe({
       next: (playlist) => {
         console.log('Playlist loaded:', playlist);
-        this.playlist = playlist;
         
-        // Only set current item if the playlist has items
-        if (playlist.items && playlist.items.length > 0) {
-          this.currentItem = playlist.items[0]; // For demo, start with first item
+        // Deep clone the playlist to ensure we don't lose data
+        this.cachedPlaylist = JSON.parse(JSON.stringify(playlist));
+        
+        // Only update the playlist reference if we don't already have cached data
+        // or if this is our first load
+        if (!this.loadCompleted) {
+          this.playlist = playlist;
+        }
+        
+        // Only set current item if the playlist has items and we don't already have one
+        if (playlist.items && playlist.items.length > 0 && !this.currentItem) {
+          this.currentItem = JSON.parse(JSON.stringify(playlist.items[0]));
           console.log('Current item set:', this.currentItem);
-          this.isPlaying = true; // Auto-play when a playlist is loaded
-        } else {
+          this.isPlaying = true;
+        } else if (!playlist.items || playlist.items.length === 0) {
           console.log('Playlist has no items');
           this.currentItem = null;
           this.isPlaying = false;
         }
+        
         this.loading = false;
+        this.loadCompleted = true;
       },
       error: (error) => {
         console.error('Error loading playlist:', error);
         this.error = 'Failed to load playlist';
         this.loading = false;
-        this.resetState();
+        
+        // If we have a cached playlist, use that instead of resetting
+        if (this.cachedPlaylist) {
+          this.playlist = this.cachedPlaylist;
+        } else {
+          this.resetState();
+        }
       }
     });
   }
@@ -158,8 +191,10 @@ export class CurrentPlaylistCardComponent implements OnInit, OnChanges {
   }
 
   formatDuration(seconds: number): string {
+    if (isNaN(seconds) || seconds < 0) return '0:00';
+    
     const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   }
 }
