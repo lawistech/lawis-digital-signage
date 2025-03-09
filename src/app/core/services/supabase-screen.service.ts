@@ -298,7 +298,26 @@ createScreen(screen: Omit<Screen, 'id' | 'created_at' | 'updated_at'>, registrat
         .single();
 
       if (getError) throw getError;
-      if (!screen.schedule?.upcoming) return;
+      
+      // If there are no upcoming schedules, clear the current playlist
+      if (!screen.schedule?.upcoming || screen.schedule.upcoming.length === 0) {
+        console.log(`No schedules found for screen ${screenId}, clearing current playlist`);
+        
+        const { error: clearError } = await supabase
+          .from('screens')
+          .update({
+            current_playlist: null,
+            current_playlist_started_at: null,
+            schedule: {
+              current: null,
+              upcoming: []
+            }
+          })
+          .eq('id', screenId);
+
+        if (clearError) throw clearError;
+        return;
+      }
 
       const now = new Date();
       const currentTime = now.toTimeString().split(':').slice(0, 2).join(':');
@@ -335,13 +354,17 @@ createScreen(screen: Omit<Screen, 'id' | 'created_at' | 'updated_at'>, registrat
           .from('screens')
           .update({
             current_playlist: activeSchedule.playlist_id,
-            current_playlist_started_at: new Date().toISOString()
+            current_playlist_started_at: new Date().toISOString(),
+            schedule: {
+              ...screen.schedule,
+              current: activeSchedule
+            }
           })
           .eq('id', screenId);
 
         if (updateError) throw updateError;
       }
-      // If no active schedule found or current day not in schedule, clear current playlist
+      // If no active schedule found, clear current playlist
       else if (!activeSchedule && screen.current_playlist) {
         console.log('No active schedule found, clearing current playlist');
         
@@ -349,28 +372,16 @@ createScreen(screen: Omit<Screen, 'id' | 'created_at' | 'updated_at'>, registrat
           .from('screens')
           .update({
             current_playlist: null,
-            current_playlist_started_at: null
+            current_playlist_started_at: null,
+            schedule: {
+              ...screen.schedule,
+              current: null
+            }
           })
           .eq('id', screenId);
 
         if (clearError) throw clearError;
       }
-
-      // Update the current schedule in the schedule object
-      const updatedSchedule = {
-        ...screen.schedule,
-        current: activeSchedule || null
-      };
-
-      // Update the schedule object
-      const { error: scheduleError } = await supabase
-        .from('screens')
-        .update({
-          schedule: updatedSchedule
-        })
-        .eq('id', screenId);
-
-      if (scheduleError) throw scheduleError;
 
     } catch (error) {
       console.error('Error updating current playlist:', error);

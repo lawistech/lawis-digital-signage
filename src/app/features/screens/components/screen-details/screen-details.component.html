@@ -57,6 +57,7 @@
             </div>
           }
 
+          <!-- Update the screen-details.component.html to add proper binding for schedule form -->
           <div class="bg-white rounded-lg shadow overflow-hidden">
             @if (showAddSchedule) {
               <app-add-schedule-form
@@ -69,9 +70,8 @@
               [schedules]="screen.schedule?.upcoming || []"
               (onAddSchedule)="showAddSchedule = true"
               (onEditSchedule)="editSchedule($event)"
-              (onDeleteSchedule)="deleteSchedule($event)"
+              (onDeleteSchedule)="initiateDelete($event)"
             />
-
           </div>
         </div>
 

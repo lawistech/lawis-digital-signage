@@ -1,5 +1,5 @@
-// updated current-playlist-card.component.ts
-import { Component, EventEmitter, Input, Output, OnInit } from '@angular/core';
+// Enhance CurrentPlaylistCardComponent with better data handling
+import { Component, EventEmitter, Input, Output, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PlaylistService } from '../../../../playlists/services/playlist.service';
 import { Playlist } from '../../../../../models/playlist.model';
@@ -18,7 +18,7 @@ import { Playlist } from '../../../../../models/playlist.model';
           </p>
         </div>
         <div class="flex gap-2">
-        <button
+          <button
             (click)="onView.emit(playlist)"
             class="p-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50"
             title="View Details"
@@ -26,22 +26,23 @@ import { Playlist } from '../../../../../models/playlist.model';
           >
             <span class="material-icons">play_arrow</span>
           </button>
-        <button
-              (click)="playPlaylist()"
-              class="p-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50"
-              title="Play"
-              *ngIf="playlist"
-            >
-              <span class="material-icons">visibility</span>
-            </button>
-        
+          <button
+            (click)="playPlaylist()"
+            class="p-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50"
+            title="Play"
+            *ngIf="playlist"
+          >
+            <span class="material-icons">visibility</span>
+          </button>
         </div>
       </div>
-      @if (currentItem && playlist?.items?.length) {
+      
+      <!-- Only show Now Playing section if there's a current item with proper content -->
+      @if (playlist?.items?.length && currentItem?.name) {
         <div class="mt-4 p-3 bg-white rounded border border-blue-100">
           <p class="text-sm font-medium">Now Playing:</p>
           <div class="flex items-center gap-3 mt-2">
-            @if (currentItem.type === 'image') {
+            @if (currentItem.type === 'image' && currentItem.content?.url) {
               <img 
                 [src]="currentItem.content.url" 
                 [alt]="currentItem.name"
@@ -56,7 +57,7 @@ import { Playlist } from '../../../../../models/playlist.model';
             }
             <div>
               <p class="font-medium">{{ currentItem.name }}</p>
-              <p class="text-sm text-gray-500">{{ formatDuration(currentItem.duration) }}</p>
+              <p class="text-sm text-gray-500">{{ formatDuration(currentItem.duration || 0) }}</p>
             </div>
           </div>
         </div>
@@ -64,7 +65,7 @@ import { Playlist } from '../../../../../models/playlist.model';
     </div>
   `
 })
-export class CurrentPlaylistCardComponent implements OnInit {
+export class CurrentPlaylistCardComponent implements OnInit, OnChanges {
   @Input() screenId!: string;
   @Input() currentPlaylistId: string | null = null;
   @Output() onView = new EventEmitter<Playlist>();
@@ -82,23 +83,58 @@ export class CurrentPlaylistCardComponent implements OnInit {
   ngOnInit() {
     if (this.currentPlaylistId) {
       this.loadPlaylist();
+    } else {
+      // Clear state when no playlist is present
+      this.resetState();
     }
   }
 
+  ngOnChanges(changes: SimpleChanges) {
+    // If the currentPlaylistId changes, react accordingly
+    if (changes['currentPlaylistId']) {
+      console.log('Current playlist ID changed:', this.currentPlaylistId);
+      
+      if (this.currentPlaylistId) {
+        this.loadPlaylist();
+      } else {
+        // Explicitly reset state when playlist ID is cleared
+        this.resetState();
+      }
+    }
+  }
+
+  // Helper to reset component state when no playlist is present
+  private resetState() {
+    this.playlist = null;
+    this.currentItem = null;
+    this.isPlaying = false;
+    this.error = null;
+  }
+
   loadPlaylist() {
-    if (!this.currentPlaylistId) return;
+    if (!this.currentPlaylistId) {
+      this.resetState();
+      return;
+    }
 
     this.loading = true;
     this.error = null;
+    console.log('Loading playlist with ID:', this.currentPlaylistId);
 
     this.playlistService.getPlaylist(this.currentPlaylistId).subscribe({
       next: (playlist) => {
+        console.log('Playlist loaded:', playlist);
         this.playlist = playlist;
+        
         // Only set current item if the playlist has items
         if (playlist.items && playlist.items.length > 0) {
           this.currentItem = playlist.items[0]; // For demo, start with first item
+          console.log('Current item set:', this.currentItem);
+          this.isPlaying = true; // Auto-play when a playlist is loaded
         } else {
+          console.log('Playlist has no items');
           this.currentItem = null;
+          this.isPlaying = false;
         }
         this.loading = false;
       },
@@ -106,8 +142,7 @@ export class CurrentPlaylistCardComponent implements OnInit {
         console.error('Error loading playlist:', error);
         this.error = 'Failed to load playlist';
         this.loading = false;
-        this.playlist = null;
-        this.currentItem = null;
+        this.resetState();
       }
     });
   }
