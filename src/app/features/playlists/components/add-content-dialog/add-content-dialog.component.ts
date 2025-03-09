@@ -14,7 +14,7 @@ import { MediaUploadComponent } from '../../../media/components/media-upload/med
   templateUrl:"add-content-dialog.component.html"
 })
 export class AddContentDialogComponent {
-  @Output() onAdd = new EventEmitter<PlaylistItem>();
+  @Output() onAdd = new EventEmitter<PlaylistItem[]>(); // Changed to emit an array
   @Output() onCancel = new EventEmitter<void>();
 
   private mediaService = inject(SupabaseMediaService);
@@ -22,42 +22,12 @@ export class AddContentDialogComponent {
   activeTab: 'select' | 'upload' = 'select';
   searchQuery = '';
   selectedType: 'all' | 'image' | 'video' = 'all';
-  selectedMediaId: string | null = null;
+  selectedMediaIds: string[] = []; // Changed to array of IDs
   
   mediaItems: Media[] = [];
   filteredMedia: Media[] = [];
   loading = true;
   error: string | null = null;
-
-
-  handleSubmit() {
-    const selectedMedia = this.mediaItems.find(item => item.id === this.selectedMediaId);
-    if (selectedMedia) {
-      const playlistItem: PlaylistItem = {
-        id: crypto.randomUUID(),
-        type: selectedMedia.type,
-        name: selectedMedia.name,
-        duration: selectedMedia.duration || 10,
-        content: {
-          url: selectedMedia.url,
-          thumbnail: selectedMedia.thumbnail_url || undefined
-        },
-        settings: {
-          transition: 'fade',
-          transitionDuration: 0.5,
-          scaling: 'fit',
-          muted: selectedMedia.type === 'video',
-          loop: false
-        },
-        schedule: undefined
-      };
-      // Emit a single item
-      this.onAdd.emit(playlistItem);
-    }
-  }
-
-
-  
 
   ngOnInit() {
     this.loadMedia();
@@ -89,43 +59,66 @@ export class AddContentDialogComponent {
     });
   }
 
-  selectMedia(item: Media) {
-    this.selectedMediaId = item.id;
+  // Toggle selection of media item
+  toggleSelection(item: Media) {
+    const index = this.selectedMediaIds.indexOf(item.id);
+    if (index > -1) {
+      this.selectedMediaIds.splice(index, 1);
+    } else {
+      this.selectedMediaIds.push(item.id);
+    }
+  }
+
+  // Check if a media item is selected
+  isSelected(mediaId: string): boolean {
+    return this.selectedMediaIds.includes(mediaId);
   }
 
   onUploadComplete(media: Media[]) {
     this.mediaItems = [...media, ...this.mediaItems];
     this.filterMedia();
     this.activeTab = 'select';
-    if (media.length === 1) {
-      this.selectedMediaId = media[0].id;
+    
+    // Automatically select newly uploaded items
+    if (media.length > 0) {
+      media.forEach(item => {
+        if (!this.selectedMediaIds.includes(item.id)) {
+          this.selectedMediaIds.push(item.id);
+        }
+      });
     }
   }
 
-  // handleSubmit() {
-  //   const selectedMedia = this.mediaItems.find(item => item.id === this.selectedMediaId);
-  //   if (selectedMedia) {
-  //     const playlistItem: PlaylistItem = {
-  //       id: crypto.randomUUID(),
-  //       type: selectedMedia.type,
-  //       name: selectedMedia.name,
-  //       duration: selectedMedia.duration || 10,
-  //       content: {
-  //         url: selectedMedia.url,
-  //         thumbnail: selectedMedia.thumbnail_url || undefined
-  //       },
-  //       settings: {
-  //         transition: 'fade',
-  //         transitionDuration: 0.5,
-  //         scaling: 'fit',
-  //         muted: selectedMedia.type === 'video',
-  //         loop: false
-  //       },
-  //       schedule: undefined
-  //     };
-  //     this.onAdd.emit(playlistItem);
-  //   }
-  // }
+  handleSubmit() {
+    if (this.selectedMediaIds.length === 0) {
+      return; // Don't proceed if no media is selected
+    }
+    
+    const selectedItems = this.mediaItems.filter(item => this.selectedMediaIds.includes(item.id));
+    const playlistItems: PlaylistItem[] = selectedItems.map(media => {
+      return {
+        id: crypto.randomUUID(),
+        type: media.type,
+        name: media.name,
+        duration: media.duration || 10,
+        content: {
+          url: media.url,
+          thumbnail: media.thumbnail_url || undefined
+        },
+        settings: {
+          transition: 'fade',
+          transitionDuration: 0.5,
+          scaling: 'fit',
+          muted: media.type === 'video',
+          loop: false
+        },
+        schedule: undefined
+      };
+    });
+    
+    // Emit array of playlist items
+    this.onAdd.emit(playlistItems);
+  }
 
   formatFileSize(bytes: number): string {
     const sizes = ['B', 'KB', 'MB', 'GB'];

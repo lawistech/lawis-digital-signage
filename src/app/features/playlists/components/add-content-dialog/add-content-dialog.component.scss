@@ -1,0 +1,112 @@
+/* add-content-dialog.component.scss */
+
+/* Add these styles to enhance the multi-select experience */
+
+/* Selected item styles */
+.selected-media-item {
+    position: relative;
+    overflow: hidden;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 2px solid #3b82f6; /* Blue-500 */
+      z-index: 1;
+      pointer-events: none;
+    }
+    
+    .selection-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: #3b82f6;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      
+      .material-icons {
+        font-size: 16px;
+      }
+    }
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+  }
+  
+  /* Animation for selected items */
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+  
+  .just-selected {
+    animation: pulse 0.3s ease-in-out;
+  }
+  
+  /* Counter badge */
+  .selected-counter {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #3b82f6;
+    color: white;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    
+    .counter-text {
+      margin-right: 8px;
+    }
+    
+    .clear-button {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.3);
+      }
+      
+      .material-icons {
+        font-size: 14px;
+      }
+    }
+  }
+  
+  /* Media grid item hover effects */
+  .media-grid-item {
+    transition: all 0.2s ease-in-out;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .hover-overlay {
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+    
+    &:hover .hover-overlay {
+      opacity: 1;
+    }
+  }

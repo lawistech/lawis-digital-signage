@@ -22,7 +22,6 @@ export class SupabaseMediaService {
 
   constructor(private authService: SupabaseAuthService) {}
 
-  // core/services/supabase-media.service.ts
   async uploadMedia(file: File, metadata: CreateMediaDto): Promise<MediaUploadResponse> {
     try {
       const userId = this.authService.getCurrentUserId();
@@ -97,18 +96,64 @@ export class SupabaseMediaService {
         tags: metadata.tags || []
       };
 
-      // Insert into database with user_id
-      const { data: insertData, error: insertError } = await supabase
+      // Before inserting, check if the table has a user_id column
+      const { error: checkError } = await supabase
         .from(this.TABLE_NAME)
-        .insert([{ ...mediaData, user_id: userId }])
-        .select()
-        .single();
+        .select('created_by')
+        .limit(1);
 
-      if (insertError) throw insertError;
-
-      return {
-        media: insertData as Media
-      };
+      // If the table has the user_id column, use it, otherwise use created_by
+      if (checkError && checkError.message.includes('column "user_id" does not exist')) {
+        console.log('Using created_by column instead of user_id');
+        
+        // Insert with created_by field
+        const { data: insertData, error: insertError } = await supabase
+          .from(this.TABLE_NAME)
+          .insert([{ ...mediaData, created_by: userId }])
+          .select()
+          .single();
+          
+        if (insertError) throw insertError;
+        return { media: insertData as Media };
+      } else {
+        // Try to use user_id column if it exists
+        try {
+          const { data: insertData, error: insertError } = await supabase
+            .from(this.TABLE_NAME)
+            .insert([{ ...mediaData, user_id: userId }])
+            .select()
+            .single();
+            
+          if (insertError) {
+            // If it fails with user_id, try with created_by as a fallback
+            if (insertError.message.includes('user_id')) {
+              const { data: fallbackData, error: fallbackError } = await supabase
+                .from(this.TABLE_NAME)
+                .insert([{ ...mediaData, created_by: userId }])
+                .select()
+                .single();
+                
+              if (fallbackError) throw fallbackError;
+              return { media: fallbackData as Media };
+            } else {
+              throw insertError;
+            }
+          }
+          
+          return { media: insertData as Media };
+        } catch (insertError) {
+          // Final fallback: try without user association
+          console.warn('Falling back to insert without user association:', insertError);
+          const { data: lastResortData, error: lastResortError } = await supabase
+            .from(this.TABLE_NAME)
+            .insert([mediaData])
+            .select()
+            .single();
+            
+          if (lastResortError) throw lastResortError;
+          return { media: lastResortData as Media };
+        }
+      }
     } catch (error) {
       console.error('Error uploading media:', error);
       throw error;
@@ -121,42 +166,78 @@ export class SupabaseMediaService {
       return throwError(() => new Error('User not authenticated'));
     }
 
-    let query = supabase
-      .from(this.TABLE_NAME)
-      .select('*')
-      .eq('user_id', userId); // Filter by user ID
-
-    // Apply additional filters
-    if (filter) {
-      if (filter.type?.length) {
-        query = query.in('type', filter.type);
-      }
-      if (filter.tags?.length) {
-        query = query.contains('tags', filter.tags);
-      }
-      if (filter.search) {
-        query = query.or(`name.ilike.%${filter.search}%,description.ilike.%${filter.search}%`);
-      }
-      if (filter.startDate) {
-        query = query.gte('created_at', filter.startDate);
-      }
-      if (filter.endDate) {
-        query = query.lte('created_at', filter.endDate);
-      }
-    }
-
-    return from(
-      query.order('created_at', { ascending: false })
-    ).pipe(
-      map(({ data, error }) => {
-        if (error) throw error;
-        return data as Media[];
-      }),
-      catchError((error) => {
-        console.error('Error fetching media:', error);
+    // First try with user_id
+    return from(this.fetchMediaWithUserAssociation(userId, filter)).pipe(
+      catchError(error => {
+        // If user_id column doesn't exist, try with created_by
+        if (error.message && error.message.includes('user_id does not exist')) {
+          console.log('Falling back to created_by for user association');
+          return from(this.fetchMediaWithCreatedBy(userId, filter));
+        }
         return throwError(() => error);
       })
     );
+  }
+
+  private async fetchMediaWithUserAssociation(userId: string, filter?: MediaFilter): Promise<Media[]> {
+    let query = supabase
+      .from(this.TABLE_NAME)
+      .select('*')
+      .eq('user_id', userId);
+
+    query = this.applyFilters(query, filter);
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data as Media[];
+  }
+
+  private async fetchMediaWithCreatedBy(userId: string, filter?: MediaFilter): Promise<Media[]> {
+    let query = supabase
+      .from(this.TABLE_NAME)
+      .select('*')
+      .eq('created_by', userId);
+
+    query = this.applyFilters(query, filter);
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      // If still failing, try without user filtering as a last resort
+      if (error.message.includes('created_by does not exist')) {
+        console.warn('No user association columns found, fetching all media');
+        let fallbackQuery = supabase.from(this.TABLE_NAME).select('*');
+        fallbackQuery = this.applyFilters(fallbackQuery, filter);
+        const fallbackResult = await fallbackQuery.order('created_at', { ascending: false });
+        
+        if (fallbackResult.error) throw fallbackResult.error;
+        return fallbackResult.data as Media[];
+      }
+      throw error;
+    }
+    
+    return data as Media[];
+  }
+
+  private applyFilters(query: any, filter?: MediaFilter): any {
+    if (!filter) return query;
+    
+    if (filter.type?.length) {
+      query = query.in('type', filter.type);
+    }
+    if (filter.tags?.length) {
+      query = query.contains('tags', filter.tags);
+    }
+    if (filter.search) {
+      query = query.or(`name.ilike.%${filter.search}%,description.ilike.%${filter.search}%`);
+    }
+    if (filter.startDate) {
+      query = query.gte('created_at', filter.startDate);
+    }
+    if (filter.endDate) {
+      query = query.lte('created_at', filter.endDate);
+    }
+    
+    return query;
   }
 
   getMediaById(id: string): Observable<Media> {
@@ -291,7 +372,6 @@ export class SupabaseMediaService {
     });
   }
   
-  // Also update the getVideoDuration method to be more robust
   private async getVideoDuration(videoFile: File): Promise<number> {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');

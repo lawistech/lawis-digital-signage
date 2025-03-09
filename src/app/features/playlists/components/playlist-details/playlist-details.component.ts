@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DragDropModule } from '@angular/cdk/drag-drop';
+import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { PlaylistPreviewDialogComponent } from '../playlist-preview-dialog/playlist-preview-dialog.component';
 import { PlaylistService } from '../../services/playlist.service';
 import { Playlist, PlaylistItem } from '../../../../models/playlist.model';
@@ -59,6 +59,7 @@ export class PlaylistDetailsComponent implements OnInit {
     this.selectedPlaylist = this.playlist;
     this.showPreviewDialog = true;
   }
+  
   publishPlaylist(): void {
     if (this.playlist) {
       const newStatus = this.playlist.status === 'active' ? 'draft' : 'active';
@@ -126,11 +127,10 @@ export class PlaylistDetailsComponent implements OnInit {
     }
   }
 
-  drop(event: any): void {
-    if (this.playlist) {
+  drop(event: CdkDragDrop<PlaylistItem[]>): void {
+    if (this.playlist && this.playlist.items) {
       const items = [...this.playlist.items];
-      const [removed] = items.splice(event.previousIndex, 1);
-      items.splice(event.currentIndex, 0, removed);
+      moveItemInArray(items, event.previousIndex, event.currentIndex);
       this.playlist.items = items;
       this.updatePlaylist();
     }
@@ -182,48 +182,48 @@ export class PlaylistDetailsComponent implements OnInit {
     );
   }
 
-  // playlist-details.component.ts
-handleAddContent(item: PlaylistItem): void {  // Changed to accept single item
-  if (this.playlist) {
-    // Ensure items array exists and is properly structured
-    const currentItems = Array.isArray(this.playlist.items) ? this.playlist.items : [];
-    
-    // Create a new playlist object with the added item
-    const updatedPlaylist: Playlist = {
-      ...this.playlist,
-      items: [...currentItems, item].map(playlistItem => ({
-        ...playlistItem,
-        content: {
-          url: playlistItem.content?.url || '',
-          thumbnail: playlistItem.content?.thumbnail
-        },
-        settings: {
-          transition: playlistItem.settings?.transition || 'fade',
-          transitionDuration: playlistItem.settings?.transitionDuration || 0.5,
-          scaling: playlistItem.settings?.scaling || 'fit',
-          muted: playlistItem.settings?.muted || false,
-          loop: playlistItem.settings?.loop || false
-        }
-      }))
-    };
+  // Updated to handle multiple items
+  handleAddContent(items: PlaylistItem[]): void {
+    if (this.playlist && items.length > 0) {
+      // Ensure items array exists and is properly structured
+      const currentItems = Array.isArray(this.playlist.items) ? this.playlist.items : [];
+      
+      // Create a new playlist object with the added items
+      const updatedPlaylist: Playlist = {
+        ...this.playlist,
+        items: [...currentItems, ...items].map(playlistItem => ({
+          ...playlistItem,
+          content: {
+            url: playlistItem.content?.url || '',
+            thumbnail: playlistItem.content?.thumbnail
+          },
+          settings: {
+            transition: playlistItem.settings?.transition || 'fade',
+            transitionDuration: playlistItem.settings?.transitionDuration || 0.5,
+            scaling: playlistItem.settings?.scaling || 'fit',
+            muted: playlistItem.settings?.muted || false,
+            loop: playlistItem.settings?.loop || false
+          }
+        }))
+      };
 
-    // Calculate new total duration
-    updatedPlaylist.duration = updatedPlaylist.items.reduce(
-      (total, playlistItem) => total + (playlistItem.duration || 0),
-      0
-    );
+      // Calculate new total duration
+      updatedPlaylist.duration = updatedPlaylist.items.reduce(
+        (total, playlistItem) => total + (playlistItem.duration || 0),
+        0
+      );
 
-    // Update the playlist in Supabase
-    this.playlistService.updatePlaylist(this.playlist.id, updatedPlaylist)
-      .subscribe({
-        next: (result) => {
-          this.playlist = result;
-          this.showAddContent = false;
-        },
-        error: (error) => {
-          console.error('Error updating playlist:', error);
-        }
-      });
+      // Update the playlist in Supabase
+      this.playlistService.updatePlaylist(this.playlist.id, updatedPlaylist)
+        .subscribe({
+          next: (result) => {
+            this.playlist = result;
+            this.showAddContent = false;
+          },
+          error: (error) => {
+            console.error('Error updating playlist:', error);
+          }
+        });
+    }
   }
-}
 }
