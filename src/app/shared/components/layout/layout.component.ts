@@ -1,9 +1,10 @@
-// layout.component.ts
+// shared/components/layout/layout.component.ts
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { NavigationItem } from './navigation.interface';
 import { SupabaseAuthService } from '../../../core/services/supabase-auth.service';
+import { User } from '@supabase/supabase-js';
 
 @Component({
   selector: 'app-layout',
@@ -15,6 +16,7 @@ import { SupabaseAuthService } from '../../../core/services/supabase-auth.servic
 export class LayoutComponent implements OnInit, OnDestroy {
   isSidebarOpen = false;
   isAuthenticated = false;
+  currentUser: User | null = null;
   private resizeListener: () => void;
 
   navigationItems: NavigationItem[] = [
@@ -35,9 +37,10 @@ export class LayoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Check authentication status
+    // Check authentication status and get user info
     this.authService.user$.subscribe(user => {
       this.isAuthenticated = !!user;
+      this.currentUser = user;
     });
 
     // Initialize sidebar state based on screen size
@@ -54,7 +57,32 @@ export class LayoutComponent implements OnInit, OnDestroy {
   }
 
   logout(): void {
-    // Implement logout logic using SupabaseAuthService
-    this.authService.signOut();
+    this.authService.signOut().subscribe({
+      next: () => {
+        // Redirect is handled in the auth service
+      },
+      error: (error) => {
+        console.error('Error during logout:', error);
+      }
+    });
+  }
+  
+  // Helper method to get user's email or name for display
+  getUserDisplayName(): string {
+    if (!this.currentUser) return '';
+    
+    // Use user metadata if available
+    if (this.currentUser.user_metadata?.name) {
+      return this.currentUser.user_metadata.name;
+    }
+    
+    // Fall back to email
+    return this.currentUser.email || '';
+  }
+  
+  // Helper to get first letter of name/email for avatar
+  getUserInitial(): string {
+    const displayName = this.getUserDisplayName();
+    return displayName ? displayName.charAt(0).toUpperCase() : '?';
   }
 }

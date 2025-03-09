@@ -56,6 +56,14 @@ export class AreasComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.areaFacade.loadAreas();
     this.loadAvailableScreens();
+    
+    // Add some helpful feedback if no areas exist
+    this.areas$.pipe(take(1)).subscribe(areas => {
+      if (areas.length === 0) {
+        // Maybe display a welcome message for new users with no areas
+        this.showWelcomeBanner = true;
+      }
+    });
   }
 
   ngOnDestroy(): void {

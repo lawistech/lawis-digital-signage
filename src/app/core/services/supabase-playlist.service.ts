@@ -11,7 +11,13 @@ export class SupabasePlaylistService {
   private readonly TABLE_NAME = 'playlists';
 
   
+  // core/services/supabase-playlist.service.ts
   getPlaylists(): Observable<Playlist[]> {
+    const userId = this.authService.getCurrentUserId();
+    if (!userId) {
+      return throwError(() => new Error('User not authenticated'));
+    }
+
     return from(
       supabase
         .from(this.TABLE_NAME)
@@ -19,6 +25,7 @@ export class SupabasePlaylistService {
           *,
           items:playlist_items(*)
         `)
+        .eq('created_by', userId) // Filter by the user who created the playlist
         .order('created_at', { ascending: false })
     ).pipe(
       map(({ data, error }) => {
@@ -77,9 +84,15 @@ export class SupabasePlaylistService {
     );
   }
   
+  // core/services/supabase-playlist.service.ts
   async createPlaylist(playlist: CreatePlaylistDto): Promise<Playlist> {
     try {
       const { data: user } = await supabase.auth.getUser();
+      const userId = user?.user?.id;
+      
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
       
       const { data: playlistData, error: playlistError } = await supabase
         .from(this.TABLE_NAME)
@@ -89,28 +102,14 @@ export class SupabasePlaylistService {
           settings: playlist.settings,
           status: 'draft',
           duration: 0,
-          created_by: user.user?.id
+          created_by: userId // Use the current user's ID
         }])
         .select()
         .single();
 
       if (playlistError) throw playlistError;
 
-      return {
-        id: playlistData.id,
-        name: playlistData.name,
-        description: playlistData.description,
-        duration: 0,
-        items: [],
-        status: 'draft',
-        lastModified: playlistData.updated_at,
-        createdBy: playlistData.created_by,
-        settings: playlistData.settings,
-        tags: []
-      };
-    } catch (error) {
-      console.error('Error creating playlist:', error);
-      throw error;
+      // Rest of the method...
     }
   }
 

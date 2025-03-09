@@ -10,19 +10,27 @@ import { PlaylistSchedule, PlaylistScheduleBase, Screen } from '../../models/scr
 export class SupabaseScreenService {
   private table = 'screens';
 
+  // core/services/supabase-screen.service.ts
   getScreens(): Observable<Screen[]> {
+    const userId = this.authService.getCurrentUserId();
+    if (!userId) {
+      return throwError(() => new Error('User not authenticated'));
+    }
+
     return from(
       supabase
         .from(this.table)
         .select(`
           *,
-          areas (
+          areas!inner (
             id,
             name,
             location,
-            status
+            status,
+            user_id
           )
         `)
+        .eq('areas.user_id', userId) // Use a join to filter by the user ID in the areas table
         .order('created_at', { ascending: false })
     ).pipe(
       map((response) => {

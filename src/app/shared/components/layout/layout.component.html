@@ -1,4 +1,4 @@
-
+<!-- layout.component.html -->
 <div class="min-h-screen bg-gray-100">
   <!-- Mobile menu button -->
   <div class="lg:hidden">
@@ -28,9 +28,22 @@
           <h1 class="text-xl font-bold">Resay Digital Signage</h1>
         </div>
 
+        <!-- User Profile Section -->
+        <div class="p-4 border-b">
+          <div class="flex items-center space-x-3">
+            <div class="bg-blue-500 w-10 h-10 rounded-full flex items-center justify-center text-white font-medium">
+              {{ getUserInitial() }}
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-sm font-medium text-gray-900 truncate">{{ getUserDisplayName() }}</p>
+              <p class="text-xs text-gray-500">Viewing your content</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Navigation -->
-        <nav class="flex-1 p-4 space-y-1">
-          <a
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+          
             *ngFor="let item of navigationItems"
             [routerLink]="item.path"
             routerLinkActive="bg-blue-50 text-blue-600"

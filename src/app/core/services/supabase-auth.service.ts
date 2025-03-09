@@ -139,4 +139,9 @@ export class SupabaseAuthService {
       localStorage.setItem('returnUrl', url);
     }
   }
+
+  getCurrentUserId(): string | null {
+    const user = this.getCurrentUser();
+    return user?.id || null;
+  }
 }

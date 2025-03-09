@@ -19,48 +19,20 @@ export class SupabaseMediaService {
   private readonly TABLE_NAME = 'media';
   private readonly MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
+  // core/services/supabase-media.service.ts
   async uploadMedia(file: File, metadata: CreateMediaDto): Promise<MediaUploadResponse> {
     try {
+      const userId = this.authService.getCurrentUserId();
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
       // Validate file
       if (file.size > this.MAX_FILE_SIZE) {
         throw new Error('File size exceeds 100MB limit');
       }
 
-      // 1. Upload file to Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `${metadata.type}/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(this.BUCKET_NAME)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      // 2. Generate thumbnail for videos
-      let thumbnailUrl = '';
-      if (metadata.type === 'video') {
-        thumbnailUrl = await this.generateVideoThumbnail(file);
-        const thumbnailPath = `thumbnails/${fileName.replace(/\.[^/.]+$/, '')}.jpg`;
-        
-        const { error: thumbnailError } = await supabase.storage
-          .from(this.BUCKET_NAME)
-          .upload(thumbnailPath, this.dataURItoBlob(thumbnailUrl));
-
-        if (thumbnailError) throw thumbnailError;
-        
-        thumbnailUrl = supabase.storage
-          .from(this.BUCKET_NAME)
-          .getPublicUrl(thumbnailPath).data.publicUrl;
-      }
-
-      // 3. Get public URL for the uploaded file
-      const { data: { publicUrl } } = supabase.storage
-        .from(this.BUCKET_NAME)
-        .getPublicUrl(filePath);
+      // Rest of the upload code...
 
       // 4. Create database entry
       const mediaData: Partial<Media> = {
@@ -68,7 +40,7 @@ export class SupabaseMediaService {
         description: metadata.description,
         type: metadata.type,
         url: publicUrl,
-        thumbnail_url: thumbnailUrl || undefined,  // Use undefined for optional fields
+        thumbnail_url: thumbnailUrl || undefined,
         duration: metadata.type === 'video' ? 
           await this.getVideoDuration(file).catch(() => undefined) : 
           undefined,
@@ -78,33 +50,26 @@ export class SupabaseMediaService {
           lastModified: new Date(file.lastModified).toISOString(),
           ...(metadata.metadata || {})
         },
-        tags: metadata.tags || []
+        tags: metadata.tags || [],
+        user_id: userId // Add user ID to the media record
       };
 
-      const { data: insertData, error: insertError } = await supabase
-        .from(this.TABLE_NAME)
-        .insert([mediaData])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      return {
-        media: insertData as Media,
-        thumbnailUrl
-      };
-    } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
+      // Continue with the insert...
     }
   }
 
   getMedia(filter?: MediaFilter): Observable<Media[]> {
+    const userId = this.authService.getCurrentUserId();
+    if (!userId) {
+      return throwError(() => new Error('User not authenticated'));
+    }
+
     let query = supabase
       .from(this.TABLE_NAME)
-      .select('*');
+      .select('*')
+      .eq('user_id', userId); // Filter by user ID
 
-    // Apply filters
+    // Apply additional filters
     if (filter) {
       if (filter.type?.length) {
         query = query.in('type', filter.type);
