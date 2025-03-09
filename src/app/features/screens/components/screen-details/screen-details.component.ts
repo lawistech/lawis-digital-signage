@@ -398,38 +398,41 @@ async confirmDelete(): Promise<void> {
         upcoming: updatedUpcoming
       };
 
-      // Update the screen with the new schedule
-      const updatedScreen = await this.screenService.updateScreen(
-        this.screen.id,
-        { schedule: updatedSchedule }
-      ).toPromise();
+      // Check if this was the last schedule and we're deleting it
+      const isLastSchedule = updatedUpcoming.length === 0;
+      
+      // Check if the deleted schedule was the current one
+      const isDeletingCurrentSchedule = this.screen.schedule?.current &&
+          this.screen.schedule.current.playlist_id === this.scheduleToDelete.playlist_id &&
+          this.screen.schedule.current.start_time === this.scheduleToDelete.start_time &&
+          this.screen.schedule.current.end_time === this.scheduleToDelete.end_time;
 
-      if (updatedScreen) {
-        this.screen = updatedScreen;
+      // If deleting last schedule or current schedule, clear the current playlist
+      if (isLastSchedule || isDeletingCurrentSchedule) {
+        // Clear current playlist and update schedule
+        await this.screenService.updateScreen(this.screen.id, {
+          current_playlist: null,
+          current_playlist_started_at: null,
+          schedule: {
+            current: null,
+            upcoming: updatedUpcoming
+          }
+        }).toPromise();
+      } else {
+        // Just update the schedule
+        await this.screenService.updateScreen(
+          this.screen.id,
+          { schedule: updatedSchedule }
+        ).toPromise();
         
-        // Check if the deleted schedule was the current one
-        if (this.screen.schedule?.current &&
-            this.screen.schedule.current.playlist_id === this.scheduleToDelete.playlist_id &&
-            this.screen.schedule.current.start_time === this.scheduleToDelete.start_time &&
-            this.screen.schedule.current.end_time === this.scheduleToDelete.end_time) {
-          
-          // Clear current playlist
-          await this.screenService.updateScreen(this.screen.id, {
-            current_playlist: null,
-            current_playlist_started_at: null,
-            schedule: {
-              current: null,
-              upcoming: updatedUpcoming
-            }
-          }).toPromise();
-          
-          // Check for next applicable schedule
+        // Check for next applicable schedule if needed
+        if (isDeletingCurrentSchedule) {
           await this.screenService.updateCurrentPlaylistFromSchedule(this.screen.id);
         }
-
-        // Reload screen to get the latest state
-        this.loadScreen();
       }
+
+      // Reload screen to get the latest state
+      this.loadScreen();
     } catch (error) {
       console.error('Error deleting schedule:', error);
       // Optionally add error handling/notification here

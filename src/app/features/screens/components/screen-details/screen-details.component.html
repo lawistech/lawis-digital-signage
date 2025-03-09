@@ -21,12 +21,41 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="grid grid-cols-3 gap-6">
         <div class="col-span-2 space-y-6">
-          <app-current-playlist-card
-            [screenId]="screen.id || ''"
-            [currentPlaylistId]="screen.current_playlist"
-            (onView)="viewPlaylistDetails($event)"
-            (onPlayStatusChange)="openAssignPlaylistDialog()"
-          />
+          <!-- Only show current playlist if one is assigned -->
+          @if (screen.current_playlist) {
+            <div class="bg-white rounded-lg shadow p-6 relative">
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-medium">Current Playlist</h2>
+                <button 
+                  (click)="clearCurrentPlaylist()"
+                  class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                  title="Clear current playlist"
+                >
+                  <span class="material-icons">close</span>
+                </button>
+              </div>
+              <app-current-playlist-card
+                [screenId]="screen.id || ''"
+                [currentPlaylistId]="screen.current_playlist"
+                (onView)="viewPlaylistDetails($event)"
+                (onPlayStatusChange)="openAssignPlaylistDialog()"
+              />
+            </div>
+          } @else {
+            <div class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-lg font-medium mb-4">Current Playlist</h2>
+              <div class="bg-gray-50 rounded-lg p-10 text-center">
+                <span class="material-icons text-gray-400 text-3xl mb-2">playlist_play</span>
+                <p class="text-gray-600">No playlist currently assigned</p>
+                <button 
+                  (click)="showAddSchedule = true"
+                  class="mt-4 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  Add Schedule
+                </button>
+              </div>
+            </div>
+          }
 
           <div class="bg-white rounded-lg shadow overflow-hidden">
             @if (showAddSchedule) {
