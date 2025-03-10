@@ -88,9 +88,9 @@ export class SupabaseAuthService {
       
       // Default profile with free plan limits
       const profile: UserProfile = {
-        name: userMetadata.name,
-        company: userMetadata.company,
-        avatarUrl: userMetadata.avatar_url,
+        name: userMetadata['name'],
+        company: userMetadata['company'],
+        avatarUrl: userMetadata['avatar_url'],
         plan: 'Free Plan',
         screenLimit: 5,
         storageLimit: 1024 * 1024 * 500, // 500 MB

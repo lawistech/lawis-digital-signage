@@ -3,7 +3,7 @@
   <!-- Mobile menu button -->
   <div class="lg:hidden">
     <button
-      class="fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-lg"
+      class="fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-lg hover:bg-gray-50 transition-all duration-200"
       (click)="toggleSidebar()"
     >
       @if (isSidebarOpen) {
@@ -17,32 +17,113 @@
   <!-- Sidebar -->
   @if (isAuthenticated) {
     <aside
-      class="fixed inset-y-0 left-0 z-40 w-64 bg-white shadow transform transition-transform duration-300 ease-in-out flex flex-col"
+      class="fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col"
       [class.translate-x-0]="isSidebarOpen"
       [class.-translate-x-full]="!isSidebarOpen"
       [class.lg:translate-x-0]="true"
     >
-      <!-- Logo -->
-      <div class="p-4 border-b">
-        <h1 class="text-xl font-bold">Resay Digital Signage</h1>
+      <!-- Logo and Brand -->
+      <div class="p-4 border-b border-gray-100">
+        <div class="flex items-center gap-3">
+          <div class="h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center">
+            <span class="material-icons text-white">dashboard</span>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-gray-900">Resay</h1>
+            <p class="text-xs text-gray-500">Digital Signage</p>
+          </div>
+        </div>
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav class="flex-1 py-4 px-3 overflow-y-auto space-y-1">
+        <p class="text-xs font-medium text-gray-400 uppercase tracking-wider px-3 mb-2">Main Navigation</p>
+        
         @for (item of navigationItems; track item.path) {
           <a
             [routerLink]="item.path"
             routerLinkActive="active-nav-link"
-            class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            class="flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 group"
+            [class.text-gray-600]="!isActiveRoute(item.path)"
+            [class.hover:bg-gray-50]="!isActiveRoute(item.path)"
+            [class.text-blue-600]="isActiveRoute(item.path)"
           >
-            <span class="material-icons mr-3">{{ item.icon }}</span>
+            <span class="material-icons mr-3 transition-all" [class.text-gray-400]="!isActiveRoute(item.path)">{{ item.icon }}</span>
             {{ item.label }}
+
+            @if (getNotificationCount(item.path) > 0) {
+              <span class="ml-auto bg-red-100 text-red-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                {{ getNotificationCount(item.path) }}
+              </span>
+            }
           </a>
         }
+
+        <div class="pt-4 mt-4 border-t border-gray-100">
+          <p class="text-xs font-medium text-gray-400 uppercase tracking-wider px-3 mb-2">Settings</p>
+          
+          <a
+            routerLink="/profile"
+            routerLinkActive="active-nav-link"
+            class="flex items-center px-3 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-all duration-200"
+          >
+            <span class="material-icons mr-3 text-gray-400">account_circle</span>
+            Account
+          </a>
+          
+          <a
+            routerLink="/profile/plan"
+            routerLinkActive="active-nav-link"
+            class="flex items-center px-3 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-all duration-200"
+          >
+            <span class="material-icons mr-3 text-gray-400">workspace_premium</span>
+            Subscription
+          </a>
+          
+          <button
+            (click)="logout()"
+            class="w-full flex items-center px-3 py-2.5 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-all duration-200 mt-2"
+          >
+            <span class="material-icons mr-3 text-red-400">logout</span>
+            Sign out
+          </button>
+        </div>
       </nav>
 
-      <!-- Profile Component -->
-      <app-profile></app-profile>
+      <!-- User Profile Summary -->
+      <div class="p-4 border-t border-gray-100 bg-gray-50">
+        <div class="flex items-center gap-3">
+          <div class="bg-gradient-to-br from-blue-500 to-violet-500 w-10 h-10 rounded-full flex items-center justify-center text-white font-medium shadow-md">
+            {{ getUserInitial() }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-gray-900 truncate">{{ getUserDisplayName() }}</p>
+            <div class="flex items-center">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-2">
+                {{ userProfile?.plan || 'Free Plan' }}
+              </span>
+              <a routerLink="/profile" class="text-xs text-blue-600 hover:text-blue-700">
+                Manage
+              </a>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Usage Progress -->
+        <div class="mt-3">
+          <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Storage</span>
+            <span>{{ formatStorage(userProfile?.storageUsage || 0) }} / {{ formatStorage(userProfile?.storageLimit || 500 * 1024 * 1024) }}</span>
+          </div>
+          <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div 
+              class="h-full rounded-full transition-all duration-300"
+              [class]="getUsageBarClass(userProfile?.storageUsage || 0, userProfile?.storageLimit || 500 * 1024 * 1024)"
+              [style.width.%]="getUsagePercentage(userProfile?.storageUsage || 0, userProfile?.storageLimit || 500 * 1024 * 1024)"
+            ></div>
+          </div>
+        </div>
+      </div>
     </aside>
   }
 

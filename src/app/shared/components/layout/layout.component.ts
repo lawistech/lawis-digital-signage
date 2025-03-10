@@ -1,16 +1,16 @@
 // shared/components/layout/layout.component.ts
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { NavigationItem } from './navigation.interface';
-import { SupabaseAuthService } from '../../../core/services/supabase-auth.service';
+import { SupabaseAuthService, UserProfile } from '../../../core/services/supabase-auth.service';
 import { User } from '@supabase/supabase-js';
-import { ProfileComponent } from '../profile/profile.component';
+import { Subject, filter, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule, ProfileComponent],
+  imports: [CommonModule, RouterModule],
   templateUrl: './layout.component.html',
   styleUrls: ['./layout.component.scss'],
 })
@@ -18,16 +18,22 @@ export class LayoutComponent implements OnInit, OnDestroy {
   isSidebarOpen = false;
   isAuthenticated = false;
   currentUser: User | null = null;
+  userProfile: UserProfile | null = null;
+  currentRoute: string = '';
+  private destroy$ = new Subject<void>();
   private resizeListener: () => void;
 
   navigationItems: NavigationItem[] = [
-    { path: '/areas', label: 'Areas', icon: 'dashboard' },
-    { path: '/screens', label: 'Screens', icon: 'monitor' },
-    { path: '/playlists', label: 'Playlists', icon: 'playlist_play' },
-    { path: '/media', label: 'Media', icon: 'movie' },
+    { path: '/areas', label: 'Areas', icon: 'dashboard', notifications: 0 },
+    { path: '/screens', label: 'Screens', icon: 'monitor', notifications: 0 },
+    { path: '/playlists', label: 'Playlists', icon: 'playlist_play', notifications: 0 },
+    { path: '/media', label: 'Media', icon: 'movie', notifications: 0 },
   ];
 
-  constructor(private authService: SupabaseAuthService) {
+  constructor(
+    private authService: SupabaseAuthService,
+    private router: Router
+  ) {
     this.resizeListener = () => {
       if (window.innerWidth >= 1024) {
         this.isSidebarOpen = true;
@@ -39,9 +45,32 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Check authentication status and get user info
-    this.authService.user$.subscribe(user => {
+    this.authService.user$.pipe(takeUntil(this.destroy$)).subscribe(user => {
       this.isAuthenticated = !!user;
       this.currentUser = user;
+    });
+
+    // Subscribe to user profile changes
+    this.authService.userProfile$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(profile => {
+        this.userProfile = profile;
+      });
+
+    // Track current route for active state
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd),
+      takeUntil(this.destroy$)
+    ).subscribe((event: any) => {
+      this.currentRoute = event.urlAfterRedirects || event.url;
+      
+      // Close sidebar on navigation on mobile
+      if (window.innerWidth < 1024) {
+        this.isSidebarOpen = false;
+      }
+      
+      // For demo purposes, update mock notifications
+      this.updateMockNotifications();
     });
 
     // Initialize sidebar state based on screen size
@@ -51,6 +80,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener('resize', this.resizeListener);
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   toggleSidebar(): void {
@@ -68,22 +99,63 @@ export class LayoutComponent implements OnInit, OnDestroy {
     });
   }
   
-  // Helper method to get user's email or name for display
   getUserDisplayName(): string {
-    if (!this.currentUser) return '';
-    
-    // Use user metadata if available
-    if (this.currentUser.user_metadata && this.currentUser.user_metadata['name']) {
-      return this.currentUser.user_metadata['name'];
+    if (this.userProfile?.name) {
+      return this.userProfile.name;
     }
     
-    // Fall back to email
-    return this.currentUser.email || '';
+    return this.currentUser?.email || 'User';
   }
   
-  // Helper to get first letter of name/email for avatar
   getUserInitial(): string {
     const displayName = this.getUserDisplayName();
     return displayName ? displayName.charAt(0).toUpperCase() : '?';
+  }
+  
+  isActiveRoute(path: string): boolean {
+    // Handles both exact matches and child routes
+    return this.currentRoute === path || this.currentRoute.startsWith(`${path}/`);
+  }
+  
+  formatStorage(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+  }
+
+  getUsagePercentage(usage: number, limit: number): number {
+    const percentage = (usage / limit) * 100;
+    return Math.min(percentage, 100); // Cap at 100%
+  }
+
+  getUsageBarClass(usage: number, limit: number): string {
+    const percentage = (usage / limit) * 100;
+    
+    if (percentage >= 90) {
+      return 'bg-red-500'; // Critical
+    } else if (percentage >= 75) {
+      return 'bg-amber-500'; // Warning
+    } else {
+      return 'bg-blue-500'; // Good
+    }
+  }
+  
+  getNotificationCount(path: string): number {
+    const item = this.navigationItems.find(item => item.path === path);
+    return item && item.notifications !== undefined ? item.notifications : 0;
+  }
+  
+  // For demo purposes only - in real app, this would be replaced with actual notifications
+  private updateMockNotifications(): void {
+    // Reset all notifications
+    this.navigationItems.forEach(item => item.notifications = 0);
+    
+    // Add some mock notifications based on the route
+    if (this.currentRoute.includes('areas')) {
+      this.navigationItems.find(item => item.path === '/screens')!.notifications = 2;
+    } else if (this.currentRoute.includes('screens')) {
+      this.navigationItems.find(item => item.path === '/playlists')!.notifications = 1;
+    }
   }
 }
