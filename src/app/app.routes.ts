@@ -74,6 +74,18 @@ export const routes: Routes = [
       .then(m => m.MediaComponent)
   },
   {
+    path: 'profile',
+    canActivate: [() => new AuthGuard().canActivate()],
+    loadComponent: () => import('./features/profile/profile-settings.component')
+      .then(m => m.ProfileSettingsComponent)
+  },
+  {
+    path: 'profile/plan',
+    canActivate: [() => new AuthGuard().canActivate()],
+    loadComponent: () => import('./features/profile/upgrade-plan.component')
+      .then(m => m.UpgradePlanComponent)
+  },
+  {
     path: 'unauthorized',
     loadComponent: () => import('./shared/components/unauthorized/unauthorized.component')
       .then(m => m.UnauthorizedComponent)

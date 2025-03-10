@@ -1,0 +1,117 @@
+<!-- upgrade-plan.component.html -->
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="text-center mb-12">
+      <h1 class="text-3xl font-bold text-gray-900 mb-4">Upgrade Your Plan</h1>
+      <p class="text-lg text-gray-600 max-w-3xl mx-auto">
+        Choose the perfect plan for your digital signage needs. All plans include core features with different limits and capabilities.
+      </p>
+    </div>
+    
+    <!-- Pricing Toggle -->
+    <div class="flex justify-center mb-12">
+      <div class="flex items-center p-1 bg-gray-100 rounded-lg">
+        <button 
+          (click)="billingInterval = 'month'" 
+          [class.bg-white]="billingInterval === 'month'" 
+          [class.shadow-sm]="billingInterval === 'month'"
+          class="px-4 py-2 text-sm font-medium rounded-md transition-all duration-200"
+        >
+          Monthly
+        </button>
+        <button 
+          (click)="billingInterval = 'year'" 
+          [class.bg-white]="billingInterval === 'year'" 
+          [class.shadow-sm]="billingInterval === 'year'"
+          class="px-4 py-2 text-sm font-medium rounded-md transition-all duration-200"
+        >
+          Yearly <span class="text-green-500 ml-1">Save 15%</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Pricing Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div *ngFor="let plan of plans" 
+        class="bg-white rounded-xl shadow-lg border overflow-hidden transition-all duration-300 hover:shadow-xl"
+        [class.border-blue-500]="plan.recommended"
+        [class.transform]="plan.recommended" 
+        [class.hover:scale-105]="plan.recommended"
+        [class.z-10]="plan.recommended"
+      >
+        <!-- Plan Header -->
+        <div *ngIf="plan.recommended" class="bg-blue-500 text-white text-center py-1 text-sm font-medium">
+          RECOMMENDED
+        </div>
+        
+        <div class="p-6">
+          <h2 class="text-xl font-bold text-gray-900">{{ plan.name }}</h2>
+          <p class="text-gray-600 mb-4">{{ plan.description }}</p>
+          
+          <div class="mt-4 mb-6">
+            <span class="text-4xl font-bold">${{ getPlanPrice(plan) }}</span>
+            <span class="text-gray-500">/{{ billingInterval }}</span>
+          </div>
+          
+          <button
+            (click)="selectPlan(plan)"
+            class="w-full py-2 rounded-lg mb-6"
+            [class.bg-blue-600]="plan.recommended"
+            [class.text-white]="plan.recommended"
+            [class.hover:bg-blue-700]="plan.recommended"
+            [class.bg-gray-100]="!plan.recommended"
+            [class.hover:bg-gray-200]="!plan.recommended"
+            [disabled]="currentPlan === plan.name"
+          >
+            {{ currentPlan === plan.name ? 'Current Plan' : 'Select Plan' }}
+          </button>
+          
+          <!-- Limits -->
+          <div class="mb-6 space-y-3">
+            <div>
+              <div class="flex justify-between text-sm text-gray-600 mb-1">
+                <span>Screens</span>
+                <span>{{ plan.limits.screens }}</span>
+              </div>
+              <div class="h-2 bg-gray-100 rounded-full">
+                <div 
+                  class="h-full rounded-full bg-blue-500" 
+                  [style.width.%]="getPercentage(plan.limits.screens, 50)"
+                ></div>
+              </div>
+            </div>
+            
+            <div>
+              <div class="flex justify-between text-sm text-gray-600 mb-1">
+                <span>Storage</span>
+                <span>{{ formatStorage(plan.limits.storage) }}</span>
+              </div>
+              <div class="h-2 bg-gray-100 rounded-full">
+                <div 
+                  class="h-full rounded-full bg-blue-500" 
+                  [style.width.%]="getPercentage(plan.limits.storage, 10000)"
+                ></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Features -->
+          <div class="border-t border-gray-100 pt-4">
+            <h3 class="text-sm font-medium text-gray-900 mb-2">What's included:</h3>
+            <ul class="space-y-2">
+              <li *ngFor="let feature of plan.features" class="flex items-start text-sm">
+                <span class="material-icons text-green-500 mr-2 text-base">check_circle</span>
+                <span>{{ feature }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Additional Information -->
+    <div class="mt-12 text-center">
+      <p class="text-gray-600">
+        Need a custom plan? <a href="#" class="text-blue-600 hover:underline">Contact sales</a>
+      </p>
+    </div>
+  </div>

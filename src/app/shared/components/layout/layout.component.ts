@@ -5,11 +5,12 @@ import { RouterModule } from '@angular/router';
 import { NavigationItem } from './navigation.interface';
 import { SupabaseAuthService } from '../../../core/services/supabase-auth.service';
 import { User } from '@supabase/supabase-js';
+import { ProfileComponent } from '../profile/profile.component';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, ProfileComponent],
   templateUrl: './layout.component.html',
   styleUrls: ['./layout.component.scss'],
 })
