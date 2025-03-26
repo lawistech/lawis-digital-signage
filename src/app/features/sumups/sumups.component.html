@@ -1,0 +1,106 @@
+<!-- sumups.component.html -->
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6 mb-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-900">Sumups</h1>
+          <p class="mt-1 text-sm text-gray-500">Manage your sumup collections</p>
+        </div>
+  
+        <div class="flex flex-col sm:flex-row w-full md:w-auto gap-3">
+          <!-- Search -->
+          <div class="relative flex-grow sm:max-w-xs">
+            <input
+              type="text"
+              [(ngModel)]="searchQuery"
+              placeholder="Search sumups..."
+              class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-200 transition-colors"
+            />
+            <span class="material-icons absolute left-3 top-2.5 text-gray-400 text-sm">search</span>
+          </div>
+  
+          <!-- Add Sumup Button -->
+          <button
+            (click)="createSumup()"
+            class="flex items-center justify-center px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium shadow-lg"
+          >
+            <span class="material-icons text-sm mr-2">add</span>
+            Add Sumup
+          </button>
+        </div>
+      </div>
+    </div>
+  
+    <!-- Stats Overview -->
+    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-2">Total Sumups</h3>
+        <p class="text-2xl font-semibold">{{ stats.totalSumups }}</p>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-2">Active Sumups</h3>
+        <p class="text-2xl font-semibold">{{ stats.activeSumups }}</p>
+      </div>
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-2">Last Updated</h3>
+        <p class="text-2xl font-semibold">{{ stats.lastUpdated }}</p>
+      </div>
+    </div>
+  
+    <!-- Error Message -->
+    @if (error) {
+      <div class="max-w-7xl mx-auto mb-6">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center text-red-700">
+          <span class="material-icons mr-2">error</span>
+          {{ error }}
+        </div>
+      </div>
+    }
+  
+    <!-- Loading State -->
+    @if (loading) {
+      <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="flex items-center justify-center py-12">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    }
+  
+    <!-- Sumups Grid -->
+    @if (!loading) {
+      @if (filteredSumups.length === 0) {
+        <div class="max-w-7xl mx-auto px-4 py-6">
+          <div class="bg-white rounded-xl p-8 text-center">
+            <span class="material-icons text-4xl text-gray-400 mb-2">dashboard</span>
+            <h3 class="text-lg font-medium text-gray-900 mb-1">No sumups found</h3>
+            @if (searchQuery) {
+              <p class="text-gray-500">Try adjusting your search criteria</p>
+            } @else {
+              <p class="text-gray-500">Create your first sumup to get started</p>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="max-w-7xl mx-auto px-4 py-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            @for (sumup of filteredSumups; track sumup.id) {
+              <app-sumup-card
+                [sumup]="sumup"
+                (edit)="editSumup($event)"
+                (delete)="deleteSumup($event)"
+              />
+            }
+          </div>
+        </div>
+      }
+    }
+  
+    <!-- Dialogs -->
+    @if (showCreateDialog) {
+      <app-create-sumup-dialog
+        (onCreate)="handleCreateSumup()"
+        (onCancel)="showCreateDialog = false"
+      />
+    }
+  </div>
