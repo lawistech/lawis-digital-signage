@@ -1,6 +1,6 @@
 // core/services/supabase-media.service.ts - FIXED
 import { Injectable } from '@angular/core';
-import { Observable, from, map, catchError, throwError, lastValueFrom } from 'rxjs';
+import { Observable, from, map, catchError, throwError } from 'rxjs';
 import { supabase } from './supabase.config';
 import { 
   Media, 
@@ -21,6 +21,9 @@ export class SupabaseMediaService {
 
   constructor(private authService: SupabaseAuthService) {}
 
+  // Fix for the "operator does not exist: bigint + jsonb" error
+  // Fix for the "operator does not exist: bigint + jsonb" error
+
   async uploadMedia(file: File, metadata: CreateMediaDto): Promise<MediaUploadResponse> {
     try {
       const userId = this.authService.getCurrentUserId();
@@ -33,17 +36,14 @@ export class SupabaseMediaService {
         throw new Error(`File size exceeds 100MB limit`);
       }
 
-      // Generate a unique filename with timestamp and random string
+      // Generate a unique filename
       const fileExt = file.name.split('.').pop();
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 15);
       const fileName = `${timestamp}-${randomString}.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
 
-      console.log(`Starting upload for file: ${file.name}, size: ${file.size}, type: ${file.type}`);
-      console.log(`Generated path: ${filePath}`);
-
-      // Try to upload the file to storage
+      // Upload the file to storage
       const { data: fileData, error: uploadError } = await supabase.storage
         .from(this.BUCKET_NAME)
         .upload(filePath, file, {
@@ -52,33 +52,20 @@ export class SupabaseMediaService {
         });
 
       if (uploadError) {
-        console.error("Storage upload error:", uploadError);
         throw new Error(`Storage error: ${uploadError.message}`);
       }
 
-      if (!fileData) {
-        throw new Error("File upload failed with no error details");
-      }
-
-      console.log("File uploaded successfully to storage path:", fileData.path);
-
-      // Get public URL for the file
+      // Get public URL
       const { data: urlData } = supabase.storage
         .from(this.BUCKET_NAME)
         .getPublicUrl(filePath);
         
-      if (!urlData || !urlData.publicUrl) {
-        throw new Error("Failed to get public URL for uploaded file");
-      }
-
       const publicUrl = urlData.publicUrl;
-      console.log("Public URL generated:", publicUrl);
 
-      // Try to generate thumbnail for videos
+      // Generate thumbnail for videos
       let thumbnailUrl: string | undefined;
       if (metadata.type === 'video') {
         try {
-          console.log("Generating thumbnail for video");
           const thumbnailDataUri = await this.generateVideoThumbnail(file);
           const thumbnailBlob = this.dataURItoBlob(thumbnailDataUri);
           const thumbnailFilePath = `${userId}/thumbnails/${fileName.replace(/\.\w+$/, '.jpg')}`;
@@ -89,44 +76,41 @@ export class SupabaseMediaService {
               cacheControl: '3600',
               upsert: false
             });
-            
+              
           if (!thumbnailError && thumbnailData) {
             const { data: thumbUrlData } = supabase.storage
               .from(this.BUCKET_NAME)
               .getPublicUrl(thumbnailFilePath);
               
             thumbnailUrl = thumbUrlData.publicUrl;
-            console.log("Thumbnail generated and uploaded:", thumbnailUrl);
-          } else if (thumbnailError) {
-            console.warn("Thumbnail upload error:", thumbnailError);
           }
         } catch (error) {
-          // Don't fail the whole upload if thumbnail generation fails
           console.warn('Failed to generate thumbnail:', error);
         }
       }
 
-      // Try to get video duration
+      // Get video duration
       let duration: number | undefined;
       if (metadata.type === 'video') {
         try {
           duration = await this.getVideoDuration(file);
-          console.log("Video duration extracted:", duration);
         } catch (error) {
           console.warn("Could not determine video duration:", error);
         }
       }
 
-      // Create database entry - FIX: Convert file size to string to avoid bigint + jsonb error
-      const mediaData: Partial<Media> = {
+      // Create database entry - Fix: Store file size as a separate column AND as a string in metadata
+      const storageSize = file.size;
+      const mediaData = {
         name: metadata.name,
         description: metadata.description,
         type: metadata.type,
         url: publicUrl,
         thumbnail_url: thumbnailUrl,
         duration: duration,
+        storage_size: storageSize, // Store size as a separate numeric column
         metadata: {
-          size: file.size, // This will be safely serialized as a number in JSON
+          size: String(file.size), // Store as string in metadata to avoid bigint + jsonb error
           format: file.type,
           lastModified: new Date(file.lastModified).toISOString(),
           ...(metadata.metadata || {})
@@ -134,92 +118,63 @@ export class SupabaseMediaService {
         tags: metadata.tags || []
       };
 
-      console.log("Creating database entry with data:", JSON.stringify(mediaData));
-
-      // Handle size separately to avoid the bigint + jsonb error
-      const storageSize = file.size;
-      const safeMediaData = {
-        ...mediaData,
-        storage_size: storageSize, // Store size as a separate numeric column
-        metadata: {
-          ...mediaData.metadata,
-          size: String(file.size) // Store as string in the metadata as well
-        }
-      };
-
-      // Attempt to insert with different field strategies
+      // Try multiple insertion strategies to handle different database schemas
       let result;
       try {
         // Try with user_id field
         const { data: insertData, error: insertError } = await supabase
           .from(this.TABLE_NAME)
-          .insert([{ ...safeMediaData, user_id: userId }])
+          .insert([{ ...mediaData, user_id: userId }])
           .select()
           .single();
         
         if (insertError) {
           if (insertError.message.includes('user_id')) {
-            console.log("user_id field failed, trying created_by");
             throw new Error("user_id field not available");
           } else {
-            console.error("Database insert error:", insertError);
-            throw new Error(`Database error: ${insertError.message}`);
+            throw insertError;
           }
         }
         
         result = insertData;
-        console.log("Successfully inserted media with user_id field");
       } catch (userIdError) {
         // Fallback to created_by
         try {
           const { data: fallbackData, error: fallbackError } = await supabase
             .from(this.TABLE_NAME)
-            .insert([{ ...safeMediaData, created_by: userId }])
+            .insert([{ ...mediaData, created_by: userId }])
             .select()
             .single();
             
           if (fallbackError) {
-            console.error("Database fallback insert error:", fallbackError);
-            throw new Error(`Database fallback error: ${fallbackError.message}`);
+            throw fallbackError;
           }
           
           result = fallbackData;
-          console.log("Successfully inserted media with created_by field");
         } catch (createdByError) {
           // Last attempt without user association
-          console.warn("Both user_id and created_by failed, attempting insert without user field");
           const { data: lastResortData, error: lastResortError } = await supabase
             .from(this.TABLE_NAME)
-            .insert([safeMediaData])
+            .insert([mediaData])
             .select()
             .single();
             
           if (lastResortError) {
-            console.error("Final database insert attempt failed:", lastResortError);
-            throw new Error(`Final insert error: ${lastResortError.message}`);
+            throw lastResortError;
           }
           
           result = lastResortData;
-          console.log("Successfully inserted media without user association");
         }
       }
 
-      if (!result) {
-        throw new Error("Failed to create database entry for uploaded file");
-      }
-
-      console.log("Upload process completed successfully for file:", file.name);
       return { media: result as Media };
-
     } catch (error) {
       console.error('Error uploading media:', error);
       throw error;
     }
   }
 
-  // Rest of the service remains the same
-  // ...
-
+  // Rest of the methods remain unchanged
   getMedia(filter?: MediaFilter): Observable<Media[]> {
     const userId = this.authService.getCurrentUserId();
     if (!userId) {
