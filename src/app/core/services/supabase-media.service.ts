@@ -1,3 +1,4 @@
+// core/services/supabase-media.service.ts - FIXED
 import { Injectable } from '@angular/core';
 import { Observable, from, map, catchError, throwError, lastValueFrom } from 'rxjs';
 import { supabase } from './supabase.config';
@@ -116,7 +117,7 @@ export class SupabaseMediaService {
         }
       }
 
-      // Create database entry
+      // Create database entry - FIX: Convert file size to string to avoid bigint + jsonb error
       const mediaData: Partial<Media> = {
         name: metadata.name,
         description: metadata.description,
@@ -125,7 +126,7 @@ export class SupabaseMediaService {
         thumbnail_url: thumbnailUrl,
         duration: duration,
         metadata: {
-          size: file.size,
+          size: file.size, // This will be safely serialized as a number in JSON
           format: file.type,
           lastModified: new Date(file.lastModified).toISOString(),
           ...(metadata.metadata || {})
@@ -135,13 +136,24 @@ export class SupabaseMediaService {
 
       console.log("Creating database entry with data:", JSON.stringify(mediaData));
 
-      // Attempt to determine whether to use user_id or created_by
+      // Handle size separately to avoid the bigint + jsonb error
+      const storageSize = file.size;
+      const safeMediaData = {
+        ...mediaData,
+        storage_size: storageSize, // Store size as a separate numeric column
+        metadata: {
+          ...mediaData.metadata,
+          size: String(file.size) // Store as string in the metadata as well
+        }
+      };
+
+      // Attempt to insert with different field strategies
       let result;
       try {
         // Try with user_id field
         const { data: insertData, error: insertError } = await supabase
           .from(this.TABLE_NAME)
-          .insert([{ ...mediaData, user_id: userId }])
+          .insert([{ ...safeMediaData, user_id: userId }])
           .select()
           .single();
         
@@ -162,7 +174,7 @@ export class SupabaseMediaService {
         try {
           const { data: fallbackData, error: fallbackError } = await supabase
             .from(this.TABLE_NAME)
-            .insert([{ ...mediaData, created_by: userId }])
+            .insert([{ ...safeMediaData, created_by: userId }])
             .select()
             .single();
             
@@ -178,7 +190,7 @@ export class SupabaseMediaService {
           console.warn("Both user_id and created_by failed, attempting insert without user field");
           const { data: lastResortData, error: lastResortError } = await supabase
             .from(this.TABLE_NAME)
-            .insert([mediaData])
+            .insert([safeMediaData])
             .select()
             .single();
             
@@ -204,6 +216,9 @@ export class SupabaseMediaService {
       throw error;
     }
   }
+
+  // Rest of the service remains the same
+  // ...
 
   getMedia(filter?: MediaFilter): Observable<Media[]> {
     const userId = this.authService.getCurrentUserId();
