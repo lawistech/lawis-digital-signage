@@ -27,6 +27,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     { path: '/areas', label: 'Areas', icon: 'dashboard', notifications: 0 },
     { path: '/screens', label: 'Screens', icon: 'monitor', notifications: 0 },
     { path: '/playlists', label: 'Playlists', icon: 'playlist_play', notifications: 0 },
+    { path: '/sumups', label: 'Sumups', icon: 'view_carousel', notifications: 0 },
     { path: '/media', label: 'Media', icon: 'movie', notifications: 0 },
   ];
 
@@ -174,6 +175,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
       this.navigationItems.find(item => item.path === '/screens')!.notifications = 2;
     } else if (this.currentRoute.includes('screens')) {
       this.navigationItems.find(item => item.path === '/playlists')!.notifications = 1;
+    } else if (this.currentRoute.includes('playlists')) {
+      this.navigationItems.find(item => item.path === '/sumups')!.notifications = 1;
     }
   }
 }

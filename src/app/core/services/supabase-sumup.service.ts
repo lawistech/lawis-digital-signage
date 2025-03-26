@@ -1,6 +1,6 @@
 // src/app/core/services/supabase-sumup.service.ts
 import { Injectable } from '@angular/core';
-import { Observable, from, map, catchError, throwError, of, forkJoin } from 'rxjs';
+import { Observable, from, map, catchError, throwError, of, forkJoin, switchMap } from 'rxjs';
 import { supabase } from './supabase.config';
 import { Sumup, CreateSumupDto, UpdateSumupDto } from '../../models/sumup.model';
 import { SupabaseAuthService } from './supabase-auth.service';
@@ -61,12 +61,13 @@ export class SupabaseSumupService {
     );
   }
 
-  getSumupWithPlaylists(id: string): Observable<Sumup> {
+  // Fixed version of getSumupWithPlaylists function
+getSumupWithPlaylists(id: string): Observable<Sumup> {
     return this.getSumup(id).pipe(
-      map(sumup => {
+      switchMap(sumup => {
         if (!sumup.playlist_ids || sumup.playlist_ids.length === 0) {
           sumup.playlists = [];
-          return sumup;
+          return of(sumup);
         }
         
         // Fetch playlists for the sumup

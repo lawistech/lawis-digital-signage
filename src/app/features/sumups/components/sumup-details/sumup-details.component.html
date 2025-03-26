@@ -1,0 +1,298 @@
+<!-- sumup-details.component.html -->
+<div class="min-h-screen bg-gray-50">
+    <!-- Header with Back Button and Title -->
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-sm p-6 mb-6">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+          <button
+            (click)="goBack()"
+            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <span class="material-icons">arrow_back</span>
+          </button>
+          
+          @if (!isEditMode) {
+            <div>
+              <h1 class="text-2xl font-semibold text-gray-900">{{ sumup?.name }}</h1>
+              <div class="flex items-center mt-1">
+                <span 
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+                  [ngClass]="getStatusColor(sumup?.status)"
+                >
+                  {{ sumup?.status }}
+                </span>
+              </div>
+            </div>
+          } @else {
+            <h1 class="text-2xl font-semibold text-gray-900">Edit Sumup</h1>
+          }
+        </div>
+        
+        <div class="flex items-center space-x-3">
+          @if (!isEditMode) {
+            <button
+              (click)="toggleEditMode()"
+              class="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 flex items-center gap-2"
+            >
+              <span class="material-icons text-sm">edit</span>
+              Edit
+            </button>
+            <button
+              (click)="deleteSumup()"
+              class="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 flex items-center gap-2"
+            >
+              <span class="material-icons text-sm">delete</span>
+              Delete
+            </button>
+          } @else {
+            <button
+              (click)="toggleEditMode()"
+              class="px-4 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  
+    <!-- Success/Error Messages -->
+    @if (successMessage) {
+      <div class="max-w-7xl mx-auto mb-6">
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center text-green-700">
+          <span class="material-icons mr-2">check_circle</span>
+          {{ successMessage }}
+        </div>
+      </div>
+    }
+  
+    @if (error) {
+      <div class="max-w-7xl mx-auto mb-6">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center text-red-700">
+          <span class="material-icons mr-2">error</span>
+          {{ error }}
+        </div>
+      </div>
+    }
+  
+    <!-- Loading State -->
+    @if (loading) {
+      <div class="max-w-7xl mx-auto py-12 flex justify-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }
+  
+    <!-- Main Content -->
+    @if (!loading && sumup) {
+      <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
+        <!-- Left Column -->
+        <div class="md:col-span-2 space-y-6">
+          <!-- Sumup Details -->
+          @if (!isEditMode) {
+            <div class="bg-white rounded-lg shadow-sm p-6">
+              <h2 class="text-lg font-medium mb-4">Details</h2>
+              <div class="prose prose-sm max-w-none text-gray-600">
+                @if (sumup.description) {
+                  <p>{{ sumup.description }}</p>
+                } @else {
+                  <p class="text-gray-400 italic">No description provided</p>
+                }
+              </div>
+              <div class="mt-4 flex items-center text-sm text-gray-500">
+                <span class="material-icons text-gray-400 mr-1 text-sm">calendar_today</span>
+                Created: {{ sumup.created_at | date:'medium' }}
+              </div>
+              <div class="mt-1 flex items-center text-sm text-gray-500">
+                <span class="material-icons text-gray-400 mr-1 text-sm">update</span>
+                Last updated: {{ sumup.updated_at | date:'medium' }}
+              </div>
+            </div>
+          } @else {
+            <!-- Edit Form -->
+            <div class="bg-white rounded-lg shadow-sm p-6">
+              <h2 class="text-lg font-medium mb-4">Edit Sumup</h2>
+              <form [formGroup]="editForm" (ngSubmit)="saveChanges()" class="space-y-4">
+                <div>
+                  <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    id="name"
+                    formControlName="name"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    id="description"
+                    formControlName="description"
+                    rows="4"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  ></textarea>
+                </div>
+                
+                <div>
+                  <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    id="status"
+                    formControlName="status"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+                
+                <div class="pt-4">
+                  <button
+                    type="submit"
+                    [disabled]="!editForm.valid || savingChanges"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    @if (savingChanges) {
+                      <span class="material-icons animate-spin text-sm">refresh</span>
+                    }
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          }
+  
+          <!-- Playlists Section -->
+          <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-lg font-medium">Playlists</h2>
+              <button
+                (click)="addPlaylist()"
+                class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 flex items-center gap-2 text-sm"
+              >
+                <span class="material-icons text-sm">add</span>
+                Add Playlist
+              </button>
+            </div>
+            
+            @if (selectedPlaylists.length === 0) {
+              <div class="bg-gray-50 rounded-lg p-8 text-center">
+                <span class="material-icons text-4xl text-gray-400 mb-2">playlist_play</span>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">No playlists added</h3>
+                <p class="text-gray-500">Add playlists to this sumup collection</p>
+              </div>
+            } @else {
+              <div class="space-y-4">
+                @for (playlist of selectedPlaylists; track playlist.id) {
+                  <div class="border border-gray-100 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <h3 class="font-medium text-gray-800">{{ playlist.name }}</h3>
+                        <p class="text-sm text-gray-500 mt-1">
+                          {{ playlist.items.length }} items • {{ formatDuration(playlist.duration) }}
+                        </p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button
+                          class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                          title="View details"
+                          [routerLink]="['/playlists', playlist.id]"
+                        >
+                          <span class="material-icons">visibility</span>
+                        </button>
+                        <button
+                          (click)="removePlaylist(playlist)"
+                          class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Remove from sumup"
+                        >
+                          <span class="material-icons">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                    @if (playlist.description) {
+                      <p class="text-sm text-gray-600 mt-2 line-clamp-2">{{ playlist.description }}</p>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+  
+        <!-- Right Column -->
+        <div class="space-y-6">
+          <!-- Sumup Stats -->
+          <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-lg font-medium mb-4">Stats</h2>
+            <div class="space-y-4">
+              <div>
+                <p class="text-sm text-gray-500">Total Playlists</p>
+                <p class="text-2xl font-light">{{ selectedPlaylists.length }}</p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500">Status</p>
+                <div class="flex items-center mt-1">
+                  <span 
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+                    [ngClass]="getStatusColor(sumup.status)"
+                  >
+                    {{ sumup.status }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+  
+  <!-- Add Playlist Dialog -->
+  @if (showAddPlaylistDialog) {
+    <div class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-medium">Add Playlist</h2>
+          <button
+            (click)="showAddPlaylistDialog = false"
+            class="text-gray-400 hover:text-gray-600"
+          >
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        
+        @if (getUnselectedPlaylists().length === 0) {
+          <div class="bg-gray-50 rounded-lg p-8 text-center">
+            <span class="material-icons text-4xl text-gray-400 mb-2">playlist_play</span>
+            <h3 class="text-base font-medium text-gray-900 mb-1">No available playlists</h3>
+            <p class="text-sm text-gray-500">All playlists have been added to this sumup</p>
+          </div>
+        } @else {
+          <div class="max-h-96 overflow-y-auto p-1">
+            @for (playlist of getUnselectedPlaylists(); track playlist.id) {
+              <div 
+                class="border border-gray-100 rounded-lg p-4 mb-3 hover:bg-blue-50 hover:border-blue-200 cursor-pointer transition-colors"
+                (click)="onPlaylistSelected(playlist)"
+              >
+                <h3 class="font-medium text-gray-800">{{ playlist.name }}</h3>
+                <p class="text-sm text-gray-500 mt-1">
+                  {{ playlist.items.length }} items • {{ formatDuration(playlist.duration) }}
+                </p>
+                @if (playlist.description) {
+                  <p class="text-sm text-gray-600 mt-2 line-clamp-2">{{ playlist.description }}</p>
+                }
+              </div>
+            }
+          </div>
+        }
+        
+        <div class="mt-4 flex justify-end">
+          <button
+            (click)="showAddPlaylistDialog = false"
+            class="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  }

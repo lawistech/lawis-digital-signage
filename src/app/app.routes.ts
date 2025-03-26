@@ -80,6 +80,18 @@ export const routes: Routes = [
       .then(m => m.MediaComponent)
   },
   {
+    path: 'sumups',
+    canActivate: [() => new AuthGuard().canActivate()],
+    loadComponent: () => import('./features/sumups/sumups.component')
+      .then(m => m.SumupsComponent)
+  },
+  {
+    path: 'sumups/:id',
+    canActivate: [() => new AuthGuard().canActivate()],
+    loadComponent: () => import('./features/sumups/components/sumup-details/sumup-details.component')
+      .then(m => m.SumupDetailsComponent)
+  },
+  {
     path: 'profile',
     canActivate: [() => new AuthGuard().canActivate()],
     loadComponent: () => import('./features/profile/profile-settings.component')
