@@ -17,7 +17,7 @@ import { SupabaseAuthService } from './supabase-auth.service';
 export class SupabaseMediaService {
   private readonly BUCKET_NAME = 'media';
   private readonly TABLE_NAME = 'media';
-  private readonly MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+  private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; //10mb
 
   constructor(private authService: SupabaseAuthService) {}
 
@@ -30,19 +30,19 @@ export class SupabaseMediaService {
       if (!userId) {
         throw new Error('User not authenticated');
       }
-
+  
       // Validate file
       if (file.size > this.MAX_FILE_SIZE) {
-        throw new Error(`File size exceeds 100MB limit`);
+        throw new Error(`File size exceeds limit`);
       }
-
+  
       // Generate a unique filename
       const fileExt = file.name.split('.').pop();
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 15);
       const fileName = `${timestamp}-${randomString}.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
-
+  
       // Upload the file to storage
       const { data: fileData, error: uploadError } = await supabase.storage
         .from(this.BUCKET_NAME)
@@ -50,18 +50,18 @@ export class SupabaseMediaService {
           cacheControl: '3600',
           upsert: false
         });
-
+  
       if (uploadError) {
         throw new Error(`Storage error: ${uploadError.message}`);
       }
-
+  
       // Get public URL
       const { data: urlData } = supabase.storage
         .from(this.BUCKET_NAME)
         .getPublicUrl(filePath);
         
       const publicUrl = urlData.publicUrl;
-
+  
       // Generate thumbnail for videos
       let thumbnailUrl: string | undefined;
       if (metadata.type === 'video') {
@@ -88,7 +88,7 @@ export class SupabaseMediaService {
           console.warn('Failed to generate thumbnail:', error);
         }
       }
-
+  
       // Get video duration
       let duration: number | undefined;
       if (metadata.type === 'video') {
@@ -98,9 +98,8 @@ export class SupabaseMediaService {
           console.warn("Could not determine video duration:", error);
         }
       }
-
-      // Create database entry - Fix: Store file size as a separate column AND as a string in metadata
-      const storageSize = file.size;
+  
+      // Create database entry - MODIFIED: Remove storage_size field
       const mediaData = {
         name: metadata.name,
         description: metadata.description,
@@ -108,7 +107,7 @@ export class SupabaseMediaService {
         url: publicUrl,
         thumbnail_url: thumbnailUrl,
         duration: duration,
-        storage_size: storageSize, // Store size as a separate numeric column
+        // Remove the storage_size field since it doesn't exist in your database
         metadata: {
           size: String(file.size), // Store as string in metadata to avoid bigint + jsonb error
           format: file.type,
@@ -117,7 +116,7 @@ export class SupabaseMediaService {
         },
         tags: metadata.tags || []
       };
-
+  
       // Try multiple insertion strategies to handle different database schemas
       let result;
       try {
@@ -166,7 +165,7 @@ export class SupabaseMediaService {
           result = lastResortData;
         }
       }
-
+  
       return { media: result as Media };
     } catch (error) {
       console.error('Error uploading media:', error);

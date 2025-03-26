@@ -72,14 +72,26 @@ export class MediaUploadComponent {
 
   async handleFiles(files: File[]): Promise<void> {
     if (!files.length) return;
-
+  
     this.isUploading = true;
     this.error = null;
     this.successfulUploads = [];
     this.totalFiles = files.length;
     this.currentFileIndex = 0;
     
-    // Filter for supported media types first
+    // Set a free-plan friendly file size limit
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    
+    // Check for oversized files first
+    const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+    if (oversizedFiles.length > 0) {
+      const fileNames = oversizedFiles.map(f => f.name).join(', ');
+      this.error = `The following file(s) exceed the 10MB size limit for free plan: ${fileNames}`;
+      this.isUploading = false;
+      return;
+    }
+    
+    // Filter for supported media types
     const validFiles = files.filter(file => 
       file.type.startsWith('image/') || file.type.startsWith('video/')
     );
@@ -93,11 +105,13 @@ export class MediaUploadComponent {
       this.isUploading = false;
       return;
     }
-
+  
     // Process each file individually to improve reliability
     for (const [index, file] of validFiles.entries()) {
       this.currentFileIndex = index;
       try {
+        console.log(`Uploading file ${index + 1}/${validFiles.length}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        
         // Create metadata for the file
         const mediaDto: CreateMediaDto = {
           name: file.name.split('.')[0], // Remove file extension from name
@@ -109,12 +123,13 @@ export class MediaUploadComponent {
             lastModified: new Date(file.lastModified).toISOString()
           }
         };
-
+  
         // Update progress to show we're working on this file
         this.uploadProgress = Math.round(((index) / this.totalFiles) * 100);
         
         // Try to upload the file
         const result = await this.mediaService.uploadMedia(file, mediaDto);
+        console.log(`Successfully uploaded: ${file.name}`);
         
         // Add to successful uploads
         this.successfulUploads.push(result.media);
@@ -126,7 +141,7 @@ export class MediaUploadComponent {
         // Continue with next file instead of stopping the whole process
       }
     }
-
+  
     // Complete the upload process
     this.uploadProgress = 100;
     
@@ -137,7 +152,9 @@ export class MediaUploadComponent {
         this.resetUpload();
       }, 500);
     } else {
-      this.error = "Failed to upload all files. Please try again or contact support.";
+      if (!this.error) {
+        this.error = "Failed to upload all files. Please try again or contact support.";
+      }
       this.isUploading = false;
     }
   }
