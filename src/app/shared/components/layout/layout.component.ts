@@ -112,9 +112,27 @@ export class LayoutComponent implements OnInit, OnDestroy {
     return displayName ? displayName.charAt(0).toUpperCase() : '?';
   }
   
+  // Fixed isActiveRoute method to properly handle profile and plan routes
   isActiveRoute(path: string): boolean {
-    // Handles both exact matches and child routes
-    return this.currentRoute === path || this.currentRoute.startsWith(`${path}/`);
+    // For the specific case of profile links
+    if (path === '/profile') {
+      // Only highlight "Account" when exactly on the profile page, not on subpages
+      return this.currentRoute === '/profile';
+    } 
+    else if (path === '/profile/plan') {
+      // Only highlight "Subscription" when on the plan page
+      return this.currentRoute === '/profile/plan';
+    }
+    // For other routes (areas, screens, etc.), maintain existing behavior
+    else {
+      // Check exact matches first
+      if (this.currentRoute === path) {
+        return true;
+      }
+      
+      // Then check child routes (e.g., /areas/123 should highlight "Areas")
+      return this.currentRoute.startsWith(`${path}/`);
+    }
   }
   
   formatStorage(bytes: number): string {

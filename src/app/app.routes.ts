@@ -1,3 +1,4 @@
+// src/app/app.routes.ts
 import { Routes } from '@angular/router';
 import { AuthGuard } from './core/guards/auth.guard';
 
@@ -31,6 +32,11 @@ export const routes: Routes = [
           .then(m => m.AuthCallbackComponent)
       }
     ]
+  },
+  {
+    path: 'preview/:id',
+    loadComponent: () => import('./features/preview/public-playlist-preview.component')
+      .then(m => m.PublicPlaylistPreviewComponent)
   },
   {
     path: 'areas',

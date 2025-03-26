@@ -22,7 +22,6 @@ export class SupabaseMediaService {
   constructor(private authService: SupabaseAuthService) {}
 
   // Fix for the "operator does not exist: bigint + jsonb" error
-  // Fix for the "operator does not exist: bigint + jsonb" error
 
   async uploadMedia(file: File, metadata: CreateMediaDto): Promise<MediaUploadResponse> {
     try {
@@ -33,7 +32,7 @@ export class SupabaseMediaService {
   
       // Validate file
       if (file.size > this.MAX_FILE_SIZE) {
-        throw new Error(`File size exceeds limit`);
+        throw new Error(`File size exceeds limit of ${this.MAX_FILE_SIZE / (1024 * 1024)}MB`);
       }
   
       // Generate a unique filename
@@ -42,6 +41,8 @@ export class SupabaseMediaService {
       const randomString = Math.random().toString(36).substring(2, 15);
       const fileName = `${timestamp}-${randomString}.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
+  
+      console.log(`Attempting to upload file to path: ${filePath}`);
   
       // Upload the file to storage
       const { data: fileData, error: uploadError } = await supabase.storage
@@ -52,8 +53,11 @@ export class SupabaseMediaService {
         });
   
       if (uploadError) {
-        throw new Error(`Storage error: ${uploadError.message}`);
+        console.error('Upload error details:', uploadError);
+        throw new Error(`Storage upload error: ${uploadError.message}`);
       }
+  
+      console.log('File uploaded successfully, getting public URL');
   
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -61,11 +65,13 @@ export class SupabaseMediaService {
         .getPublicUrl(filePath);
         
       const publicUrl = urlData.publicUrl;
+      console.log('Public URL:', publicUrl);
   
       // Generate thumbnail for videos
       let thumbnailUrl: string | undefined;
       if (metadata.type === 'video') {
         try {
+          console.log('Generating thumbnail for video');
           const thumbnailDataUri = await this.generateVideoThumbnail(file);
           const thumbnailBlob = this.dataURItoBlob(thumbnailDataUri);
           const thumbnailFilePath = `${userId}/thumbnails/${fileName.replace(/\.\w+$/, '.jpg')}`;
@@ -83,6 +89,9 @@ export class SupabaseMediaService {
               .getPublicUrl(thumbnailFilePath);
               
             thumbnailUrl = thumbUrlData.publicUrl;
+            console.log('Thumbnail URL:', thumbnailUrl);
+          } else if (thumbnailError) {
+            console.warn('Thumbnail upload error:', thumbnailError);
           }
         } catch (error) {
           console.warn('Failed to generate thumbnail:', error);
@@ -94,12 +103,13 @@ export class SupabaseMediaService {
       if (metadata.type === 'video') {
         try {
           duration = await this.getVideoDuration(file);
+          console.log('Video duration:', duration);
         } catch (error) {
           console.warn("Could not determine video duration:", error);
         }
       }
   
-      // Create database entry - MODIFIED: Remove storage_size field
+      // Create database entry
       const mediaData = {
         name: metadata.name,
         description: metadata.description,
@@ -107,7 +117,6 @@ export class SupabaseMediaService {
         url: publicUrl,
         thumbnail_url: thumbnailUrl,
         duration: duration,
-        // Remove the storage_size field since it doesn't exist in your database
         metadata: {
           size: String(file.size), // Store as string in metadata to avoid bigint + jsonb error
           format: file.type,
@@ -117,10 +126,13 @@ export class SupabaseMediaService {
         tags: metadata.tags || []
       };
   
+      console.log('Inserting media data into database:', mediaData);
+  
       // Try multiple insertion strategies to handle different database schemas
       let result;
       try {
         // Try with user_id field
+        console.log('Attempting insert with user_id field');
         const { data: insertData, error: insertError } = await supabase
           .from(this.TABLE_NAME)
           .insert([{ ...mediaData, user_id: userId }])
@@ -128,6 +140,7 @@ export class SupabaseMediaService {
           .single();
         
         if (insertError) {
+          console.error('Insert error with user_id:', insertError);
           if (insertError.message.includes('user_id')) {
             throw new Error("user_id field not available");
           } else {
@@ -136,9 +149,11 @@ export class SupabaseMediaService {
         }
         
         result = insertData;
+        console.log('Insert successful with user_id field');
       } catch (userIdError) {
         // Fallback to created_by
         try {
+          console.log('Attempting insert with created_by field');
           const { data: fallbackData, error: fallbackError } = await supabase
             .from(this.TABLE_NAME)
             .insert([{ ...mediaData, created_by: userId }])
@@ -146,12 +161,15 @@ export class SupabaseMediaService {
             .single();
             
           if (fallbackError) {
+            console.error('Insert error with created_by:', fallbackError);
             throw fallbackError;
           }
           
           result = fallbackData;
+          console.log('Insert successful with created_by field');
         } catch (createdByError) {
           // Last attempt without user association
+          console.log('Attempting insert without user association');
           const { data: lastResortData, error: lastResortError } = await supabase
             .from(this.TABLE_NAME)
             .insert([mediaData])
@@ -159,16 +177,19 @@ export class SupabaseMediaService {
             .single();
             
           if (lastResortError) {
+            console.error('Insert error without user field:', lastResortError);
             throw lastResortError;
           }
           
           result = lastResortData;
+          console.log('Insert successful without user association');
         }
       }
   
+      console.log('Media upload complete, returning result');
       return { media: result as Media };
     } catch (error) {
-      console.error('Error uploading media:', error);
+      console.error('Error in uploadMedia process:', error);
       throw error;
     }
   }
@@ -440,6 +461,26 @@ export class SupabaseMediaService {
       // Fallback - extract the path component after the bucket name
       const urlParts = url.split(this.BUCKET_NAME + '/');
       return urlParts.length > 1 ? urlParts[1] : url;
+    }
+  }
+
+  // Test function in your code
+  async testDatabaseInsert() {
+    try {
+      const { data, error } = await supabase
+        .from('media')
+        .insert([{
+          name: 'Test Image',
+          type: 'image',
+          url: 'https://example.com/test.jpg',
+          metadata: { size: '1024', format: 'image/jpeg' }
+        }])
+        .select();
+        
+      console.log('Insert result:', data);
+      if (error) console.error('Insert error:', error);
+    } catch (e) {
+      console.error('Exception during insert:', e);
     }
   }
 }
