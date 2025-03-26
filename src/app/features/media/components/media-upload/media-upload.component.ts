@@ -33,6 +33,9 @@ export class MediaUploadComponent {
   uploadProgress = 0;
   isUploading = false;
   error: string | null = null;
+  totalFiles = 0;
+  currentFileIndex = 0;
+  successfulUploads: Media[] = [];
 
   onDragOver(event: DragEvent): void {
     event.preventDefault();
@@ -72,16 +75,29 @@ export class MediaUploadComponent {
 
     this.isUploading = true;
     this.error = null;
-    const uploadedMedia: Media[] = [];
-    const totalFiles = files.length;
+    this.successfulUploads = [];
+    this.totalFiles = files.length;
+    this.currentFileIndex = 0;
+    
+    // Filter for supported media types first
+    const validFiles = files.filter(file => 
+      file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+    
+    if (validFiles.length !== files.length) {
+      console.warn(`${files.length - validFiles.length} files were skipped because they are not supported media types`);
+    }
+    
+    if (validFiles.length === 0) {
+      this.error = "No valid media files selected. Please upload images or videos only.";
+      this.isUploading = false;
+      return;
+    }
 
-    try {
-      for (const [index, file] of files.entries()) {
-        // Validate file type
-        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-          throw new Error(`File ${file.name} is not a supported media type`);
-        }
-
+    // Process each file individually to improve reliability
+    for (const [index, file] of validFiles.entries()) {
+      this.currentFileIndex = index;
+      try {
         // Create metadata for the file
         const mediaDto: CreateMediaDto = {
           name: file.name.split('.')[0], // Remove file extension from name
@@ -94,31 +110,34 @@ export class MediaUploadComponent {
           }
         };
 
-        try {
-          // Upload the file
-          const result = await this.mediaService.uploadMedia(file, mediaDto);
-          uploadedMedia.push(result.media);
-          
-          // Update progress
-          this.uploadProgress = Math.round(((index + 1) / totalFiles) * 100);
-        } catch (error) {
-          console.error(`Error uploading ${file.name}:`, error);
-          throw new Error(`Failed to upload ${file.name}`);
-        }
+        // Update progress to show we're working on this file
+        this.uploadProgress = Math.round(((index) / this.totalFiles) * 100);
+        
+        // Try to upload the file
+        const result = await this.mediaService.uploadMedia(file, mediaDto);
+        
+        // Add to successful uploads
+        this.successfulUploads.push(result.media);
+        
+        // Update progress
+        this.uploadProgress = Math.round(((index + 1) / this.totalFiles) * 100);
+      } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+        // Continue with next file instead of stopping the whole process
       }
+    }
 
-      // Complete the upload
-      this.uploadProgress = 100;
-      
-      // Wait a brief moment to show 100% progress before closing
+    // Complete the upload process
+    this.uploadProgress = 100;
+    
+    // If we have at least one successful upload, consider it a success
+    if (this.successfulUploads.length > 0) {
       setTimeout(() => {
-        this.uploadComplete.emit(uploadedMedia);
+        this.uploadComplete.emit(this.successfulUploads);
         this.resetUpload();
       }, 500);
-
-    } catch (error) {
-      console.error('Upload error:', error);
-      this.error = error instanceof Error ? error.message : 'Failed to upload files';
+    } else {
+      this.error = "Failed to upload all files. Please try again or contact support.";
       this.isUploading = false;
     }
   }
@@ -127,5 +146,6 @@ export class MediaUploadComponent {
     this.uploadProgress = 0;
     this.isUploading = false;
     this.error = null;
+    this.successfulUploads = [];
   }
 }
