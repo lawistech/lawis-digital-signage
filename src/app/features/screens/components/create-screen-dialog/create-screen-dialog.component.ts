@@ -1,5 +1,5 @@
 // create-screen-dialog.component.ts
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnDestroy, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
 import { CreateScreenDto } from '../../../../models/screen.model';
@@ -8,6 +8,7 @@ import { SupabaseScreenService } from '../../../../core/services/supabase-screen
 import { supabase } from '../../../../core/services/supabase.config';
 import { AreaService } from '../../../area/services/area.service';
 import { Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-create-screen-dialog',
@@ -15,7 +16,7 @@ import { Router } from '@angular/router';
   imports: [CommonModule, ReactiveFormsModule, FormsModule],
   templateUrl: './create-screen-dialog.component.html'
 })
-export class CreateScreenDialogComponent implements OnInit {
+export class CreateScreenDialogComponent implements OnInit, OnDestroy {
   @Output() onCreate = new EventEmitter<void>();
   @Output() onCancel = new EventEmitter<void>();
 
@@ -34,6 +35,9 @@ export class CreateScreenDialogComponent implements OnInit {
   codeForm!: FormGroup;
   screenForm!: FormGroup;
   detectedDevice: any = null;
+  
+  private destroy$ = new Subject<void>();
+  areasInitialized = false;
 
   steps = [
     {
@@ -54,7 +58,8 @@ export class CreateScreenDialogComponent implements OnInit {
     private fb: FormBuilder,
     private areaService: AreaService,
     private supabaseScreenService: SupabaseScreenService,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef
   ) {
     this.initializeForms();
   }
@@ -62,53 +67,80 @@ export class CreateScreenDialogComponent implements OnInit {
   ngOnInit(): void {
     this.loadAreas();
   }
+  
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   private initializeForms(): void {
     this.codeForm = this.fb.group({
       code: ['', [Validators.required, Validators.pattern('^[0-9]{6}$')]]
     });
 
+    // Create form with initial empty value for area_id
     this.screenForm = this.fb.group({
       name: ['', [Validators.required]],
       area_id: ['', [Validators.required]],
       orientation: ['landscape', [Validators.required]]
     });
+    
+    // Add value changes listener for debugging
+    this.screenForm.get('area_id')?.valueChanges.subscribe(value => {
+      console.log('Area ID changed to:', value);
+    });
   }
 
-  // Add this method to ensure areas are loaded properly
-  ngAfterViewInit() {
-    // Force a check for empty areas after the view is initialized
-    setTimeout(() => {
-      if (this.areas.length === 0 && !this.isLoading) {
-        this.loadAreas(); // Try loading again
-      }
-    }, 500);
-  }
-
-  // Simplify area loading to ensure it works
   private loadAreas(): void {
     this.isLoading = true;
     this.errorMessage = null;
     
-    this.areaService.getAreas().subscribe({
-      next: (areas) => {
-        this.areas = areas;
+    // Add timeout to prevent infinite loading state
+    const loadingTimeout = setTimeout(() => {
+      if (this.isLoading) {
+        console.warn('Loading areas timed out');
         this.isLoading = false;
-        
-        // Force change detection
-        setTimeout(() => {
-          // If we have areas but none selected, select the first one
-          if (this.areas.length > 0 && !this.screenForm.get('area_id')?.value) {
+        this.areasInitialized = true;
+        this.errorMessage = 'Loading areas timed out. Please try again.';
+        this.cdr.detectChanges();
+      }
+    }, 10000); // 10 second timeout
+    
+    this.areaService.getAreas()
+      .pipe(
+        takeUntil(this.destroy$)
+      )
+      .subscribe({
+        next: (areas) => {
+          clearTimeout(loadingTimeout);
+          console.log('Areas loaded successfully:', areas.length);
+          this.areas = areas;
+          this.isLoading = false;
+          this.areasInitialized = true;
+          
+          // If we have areas, select the first one by default
+          if (this.areas.length > 0) {
             this.screenForm.get('area_id')?.setValue(this.areas[0].id);
           }
-        });
-      },
-      error: (error) => {
-        console.error('Error loading areas:', error);
-        this.errorMessage = 'Failed to load areas';
-        this.isLoading = false;
-      }
-    });
+          
+          // Important: trigger change detection
+          this.cdr.detectChanges();
+        },
+        error: (error) => {
+          clearTimeout(loadingTimeout);
+          console.error('Error loading areas:', error);
+          this.errorMessage = 'Failed to load areas';
+          this.isLoading = false;
+          this.areasInitialized = true; // Still mark as initialized even on error
+          this.cdr.detectChanges();
+        },
+        complete: () => {
+          clearTimeout(loadingTimeout);
+          this.isLoading = false;
+          this.areasInitialized = true;
+          this.cdr.detectChanges();
+        }
+      });
   }
 
   retryLoadAreas(): void {
@@ -123,14 +155,16 @@ export class CreateScreenDialogComponent implements OnInit {
       this.errorMessage = null;
     }
     
-    // Small delay to ensure DOM rendering completes
-    setTimeout(() => {
-      // If showing the form, focus on the area name input
-      if (this.showAreaForm) {
+    // Force change detection to ensure UI updates
+    this.cdr.detectChanges();
+    
+    // Focus on the area name input
+    if (this.showAreaForm) {
+      setTimeout(() => {
         const areaNameInput = document.querySelector('input[name="areaName"]') as HTMLInputElement;
         if (areaNameInput) areaNameInput.focus();
-      }
-    }, 0);
+      }, 100);
+    }
   }
 
   async createNewArea(): Promise<void> {
@@ -161,11 +195,13 @@ export class CreateScreenDialogComponent implements OnInit {
       this.areas = [...this.areas, area];
       this.screenForm.get('area_id')?.setValue(area.id);
       this.resetAreaForm();
+      this.cdr.detectChanges(); // Ensure UI updates
     } catch (error) {
       console.error('Error creating area:', error);
       this.errorMessage = 'Failed to create area. Please try again.';
     } finally {
       this.isLoading = false;
+      this.cdr.detectChanges(); // Ensure UI updates
     }
   }
 
@@ -186,16 +222,10 @@ export class CreateScreenDialogComponent implements OnInit {
   }
 
   handleAreaDropdownClick(event: MouseEvent): void {
-    // Prevent click propagation if loading
-    if (this.isLoading) {
+    // Only handle click if areas are loaded and there are none
+    if (!this.isLoading && this.areasInitialized && this.areas.length === 0) {
       event.preventDefault();
       event.stopPropagation();
-      return;
-    }
-    
-    // If there are no areas, show the area form
-    if (this.areas.length === 0) {
-      event.preventDefault();
       this.toggleAreaForm();
     }
   }
@@ -204,6 +234,16 @@ export class CreateScreenDialogComponent implements OnInit {
     if (this.codeForm.valid && !this.isVerifying) {
       this.isVerifying = true;
       this.errorMessage = null;
+      
+      // Add timeout for verification process
+      const verifyTimeout = setTimeout(() => {
+        if (this.isVerifying) {
+          console.warn('Verification timed out');
+          this.isVerifying = false;
+          this.errorMessage = 'Verification timed out. Please try again.';
+          this.cdr.detectChanges();
+        }
+      }, 15000); // 15 second timeout
       
       try {
         // Just verify the code, don't mark it as claimed yet
@@ -223,8 +263,12 @@ export class CreateScreenDialogComponent implements OnInit {
           }
           
           if (data) {
+            // Clear the timeout since verification succeeded
+            clearTimeout(verifyTimeout);
+            
             // Store the code for later use
             this.registrationCode = code;
+            console.log('Registration code verified:', code);
             
             // Extract device info
             this.detectedDevice = {
@@ -242,21 +286,94 @@ export class CreateScreenDialogComponent implements OnInit {
               this.screenForm.get('orientation')?.setValue(data.device_info.orientation);
             }
             
+            // Start areas loading before changing step for better UI experience
+            if (!this.areasInitialized) {
+              console.log('Areas not initialized, starting load before step change');
+              this.loadAreas();
+            }
+            
             this.currentStep = 1;
+            
+            // Make sure we have areas loaded before proceeding with the form
+            if (!this.areasInitialized) {
+              try {
+                await this.loadAreasAsync();
+              } catch (areaError) {
+                console.error('Error loading areas during verification:', areaError);
+                // Continue anyway, the error is already displayed to the user
+              }
+            }
           } else {
+            clearTimeout(verifyTimeout);
             throw new Error('Invalid registration code');
           }
         } catch (err) {
+          clearTimeout(verifyTimeout);
           console.error('Error checking registration code:', err);
           throw new Error('Invalid registration code or already claimed');
         }
       } catch (error: any) {
+        clearTimeout(verifyTimeout);
         console.error('Error verifying code:', error);
         this.errorMessage = error.message || 'Failed to verify registration code';
       } finally {
+        // Make sure verifying state is cleared
         this.isVerifying = false;
+        this.cdr.detectChanges(); // Ensure UI updates
       }
     }
+  }
+
+  // Helper method to load areas as a Promise
+  private async loadAreasAsync(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      // Add timeout to prevent hanging promises
+      const loadingTimeout = setTimeout(() => {
+        if (this.isLoading) {
+          console.warn('Async loading of areas timed out');
+          this.isLoading = false;
+          this.areasInitialized = true;
+          this.errorMessage = 'Loading areas timed out. Please try again.';
+          this.cdr.detectChanges();
+          // Resolve anyway to prevent hanging
+          resolve();
+        }
+      }, 10000); // 10 second timeout
+      
+      this.areaService.getAreas().subscribe({
+        next: (areas) => {
+          clearTimeout(loadingTimeout);
+          console.log('Areas loaded successfully (async):', areas.length);
+          this.areas = areas;
+          this.areasInitialized = true;
+          this.isLoading = false;
+          
+          // If we have areas, select the first one
+          if (this.areas.length > 0) {
+            this.screenForm.get('area_id')?.setValue(this.areas[0].id);
+          }
+          
+          this.cdr.detectChanges();
+          resolve();
+        },
+        error: (error) => {
+          clearTimeout(loadingTimeout);
+          console.error('Error loading areas (async):', error);
+          this.errorMessage = 'Failed to load areas';
+          this.isLoading = false;
+          this.areasInitialized = true;
+          this.cdr.detectChanges();
+          // Resolve instead of reject to prevent hanging
+          resolve();
+        },
+        complete: () => {
+          clearTimeout(loadingTimeout);
+          this.isLoading = false;
+          this.areasInitialized = true;
+          this.cdr.detectChanges();
+        }
+      });
+    });
   }
 
   goToReview(): void {
@@ -415,6 +532,7 @@ export class CreateScreenDialogComponent implements OnInit {
       } catch (error: any) {
         console.error('Error creating screen:', error);
         this.errorMessage = 'Failed to create screen: ' + (error.message || 'Unknown error');
+        this.cdr.detectChanges();
       } finally {
         this.isSubmitting = false; // Reset the submission flag
       }

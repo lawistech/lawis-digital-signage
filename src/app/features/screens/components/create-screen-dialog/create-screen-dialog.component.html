@@ -125,25 +125,44 @@
                 </button>
               </div>
               
-              <!-- Direct selection without conditions blocking the dropdown -->
-              <select
-                id="areaSelect"
-                formControlName="area_id"
-                class="w-full p-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-              >
-                <option value="" disabled selected>Select an area</option>
-                @for (area of areas; track area.id) {
-                  <option [value]="area.id">{{ area.name }} ({{ area.location }})</option>
+              <!-- Area Select Dropdown with Integrated Loading State -->
+              <div class="relative">
+                <select
+                  id="areaSelect"
+                  formControlName="area_id"
+                  (click)="handleAreaDropdownClick($event)"
+                  class="w-full p-2.5 rounded-lg border border-gray-300 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                  [class.opacity-60]="isLoading"
+                  [attr.disabled]="isLoading ? true : null"
+                >
+                  <option value="" disabled>Select an area</option>
+                  @for (area of areas; track area.id) {
+                    <option [value]="area.id">{{ area.name }} ({{ area.location }})</option>
+                  }
+                  @if (areas.length === 0) {
+                    <option value="" disabled>No areas available</option>
+                  }
+                </select>
+                
+                <!-- Overlay loading indicator -->
+                @if (isLoading) {
+                  <div class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-60 rounded-lg">
+                    <div class="flex items-center gap-2">
+                      <div class="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                      <span class="text-sm text-gray-700 font-medium">Loading...</span>
+                    </div>
+                  </div>
                 }
-              </select>
+              </div>
               
               @if (shouldShowError(screenForm, 'area_id')) {
                 <p class="text-sm text-red-500 mt-1">Please select an area</p>
               }
               
               <!-- No areas message (shown below dropdown, not replacing it) -->
-              @if (areas.length === 0 && !isLoading) {
-                <div class="mt-2 text-amber-600 text-sm">
+              @if (areas.length === 0 && !isLoading && areasInitialized) {
+                <div class="mt-2 text-amber-600 text-sm flex items-center gap-1">
+                  <span class="material-icons text-amber-500 text-sm">info</span>
                   No areas available. Please add a new area.
                 </div>
               }
@@ -175,10 +194,21 @@
                         placeholder="Enter area location"
                       />
                     </div>
+                    <div>
+                      <label class="block text-sm text-gray-700 mb-1">Description (Optional)</label>
+                      <textarea
+                        name="areaDescription"
+                        [(ngModel)]="areaDescription"
+                        [ngModelOptions]="{standalone: true}"
+                        class="w-full p-2 border border-gray-300 rounded-lg"
+                        placeholder="Enter area description"
+                        rows="2"
+                      ></textarea>
+                    </div>
                     <div class="flex justify-end gap-2 pt-2">
                       <button
                         type="button"
-                        (click)="showAreaForm = false"
+                        (click)="cancelAreaForm($event)"
                         class="px-3 py-1.5 text-gray-600 hover:bg-gray-100 rounded"
                       >
                         Cancel
@@ -187,9 +217,16 @@
                         type="button"
                         (click)="createNewArea()"
                         [disabled]="!areaName || !areaLocation || isLoading"
-                        class="px-3 py-1.5 bg-blue-600 text-white rounded"
+                        class="px-3 py-1.5 bg-blue-600 text-white rounded disabled:opacity-50"
                       >
-                        Create Area
+                        @if (isLoading) {
+                          <span class="flex items-center">
+                            <span class="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></span>
+                            Creating...
+                          </span>
+                        } @else {
+                          Create Area
+                        }
                       </button>
                     </div>
                   </div>
@@ -208,6 +245,13 @@
               </select>
             </div>
           </form>
+
+          <!-- Error message display -->
+          @if (errorMessage) {
+            <div class="bg-red-50 p-3 rounded-lg text-sm text-red-600 mb-3">
+              {{ errorMessage }}
+            </div>
+          }
 
           <div class="flex justify-end space-x-3 pt-4">
             <button
@@ -232,7 +276,7 @@
         <div class="space-y-6">
           <div class="bg-gray-50 rounded-lg p-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">Review Configuration</h3>
-            <dl class="grid grid-cols-2 gap-4">
+            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <dt class="text-sm text-gray-500">Screen Name</dt>
                 <dd class="text-sm font-medium text-gray-900">{{ screenForm.value.name }}</dd>
@@ -278,8 +322,10 @@
             >
               @if (isSubmitting) {
                 <span class="material-icons animate-spin text-sm mr-2">refresh</span>
+                Creating...
+              } @else {
+                Create Screen
               }
-              {{ isSubmitting ? 'Creating...' : 'Create Screen' }}
             </button>
           </div>
         </div>
