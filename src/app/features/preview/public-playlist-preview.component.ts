@@ -38,7 +38,7 @@ import { supabase } from '../../core/services/supabase.config';
               <img
                 [src]="currentItem.content.url"
                 [alt]="currentItem.name"
-                [class]="getScalingClass(currentItem.settings?.scaling)"
+                [class]="getScalingClass(currentItem.settings.scaling)"
                 class="w-full h-full transition-opacity duration-500"
                 [class.opacity-0]="isTransitioning"
                 [class.opacity-100]="!isTransitioning"
@@ -66,7 +66,7 @@ import { supabase } from '../../core/services/supabase.config';
           </div>
 
           <!-- Transition Overlay -->
-          @if (currentItem?.settings?.transition !== 'none') {
+          @if (currentItem.settings.transition !== 'none') {
             <div
               class="absolute inset-0 bg-black transition-opacity duration-500"
               [class.opacity-0]="!isTransitioning"
