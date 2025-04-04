@@ -91,58 +91,6 @@ export class CreateScreenDialogComponent implements OnInit, OnDestroy {
     });
   }
 
-  private loadAreas(): void {
-    this.isLoading = true;
-    this.errorMessage = null;
-    
-    // Add timeout to prevent infinite loading state
-    const loadingTimeout = setTimeout(() => {
-      if (this.isLoading) {
-        console.warn('Loading areas timed out');
-        this.isLoading = false;
-        this.areasInitialized = true;
-        this.errorMessage = 'Loading areas timed out. Please try again.';
-        this.cdr.detectChanges();
-      }
-    }, 10000); // 10 second timeout
-    
-    this.areaService.getAreas()
-      .pipe(
-        takeUntil(this.destroy$)
-      )
-      .subscribe({
-        next: (areas) => {
-          clearTimeout(loadingTimeout);
-          console.log('Areas loaded successfully:', areas.length);
-          this.areas = areas;
-          this.isLoading = false;
-          this.areasInitialized = true;
-          
-          // If we have areas, select the first one by default
-          if (this.areas.length > 0) {
-            this.screenForm.get('area_id')?.setValue(this.areas[0].id);
-          }
-          
-          // Important: trigger change detection
-          this.cdr.detectChanges();
-        },
-        error: (error) => {
-          clearTimeout(loadingTimeout);
-          console.error('Error loading areas:', error);
-          this.errorMessage = 'Failed to load areas';
-          this.isLoading = false;
-          this.areasInitialized = true; // Still mark as initialized even on error
-          this.cdr.detectChanges();
-        },
-        complete: () => {
-          clearTimeout(loadingTimeout);
-          this.isLoading = false;
-          this.areasInitialized = true;
-          this.cdr.detectChanges();
-        }
-      });
-  }
-
   retryLoadAreas(): void {
     this.loadAreas();
   }
@@ -541,6 +489,177 @@ export class CreateScreenDialogComponent implements OnInit, OnDestroy {
       Object.keys(this.screenForm.controls).forEach(key => {
         this.screenForm.get(key)?.markAsTouched();
       });
+    }
+  }
+
+  private loadAreas(): void {
+    this.isLoading = true;
+    this.errorMessage = null;
+    
+    console.log('🔍 CreateScreenDialog: Loading areas...');
+    
+    // Add timeout to prevent infinite loading state
+    const loadingTimeout = setTimeout(() => {
+      if (this.isLoading) {
+        console.warn('⚠️ CreateScreenDialog: Loading areas timed out');
+        this.isLoading = false;
+        this.areasInitialized = true;
+        this.errorMessage = 'Loading areas timed out. Please try again.';
+        this.cdr.detectChanges();
+      }
+    }, 10000); // 10 second timeout
+    
+    // Let's try to directly query Supabase first to verify if data exists
+    supabase
+      .from('areas')
+      .select('*')
+      .then(({ data, error }) => {
+        console.log('📊 CreateScreenDialog: Direct Supabase areas query result:', { data, error });
+        if (error) {
+          console.error('❌ CreateScreenDialog: Direct Supabase query error:', error);
+        } else {
+          console.log(`✅ CreateScreenDialog: Found ${data?.length || 0} areas in direct query`);
+        }
+      })
+    
+    // Now use the service as normal
+    this.areaService.getAreas(true) // Force refresh to avoid cache issues
+      .pipe(
+        takeUntil(this.destroy$)
+      )
+      .subscribe({
+        next: (areas) => {
+          clearTimeout(loadingTimeout);
+          console.log('✅ CreateScreenDialog: Areas loaded successfully:', areas);
+          
+          // Check for empty vs undefined/null
+          if (!areas) {
+            console.warn('⚠️ CreateScreenDialog: Areas is null or undefined');
+            this.areas = [];
+          } else {
+            this.areas = areas;
+            console.log('📋 CreateScreenDialog: Areas content:', JSON.stringify(this.areas));
+          }
+          
+          this.isLoading = false;
+          this.areasInitialized = true;
+          
+          // If we have areas, select the first one by default
+          if (this.areas && this.areas.length > 0) {
+            console.log('🔵 CreateScreenDialog: Setting first area:', this.areas[0]);
+            this.screenForm.get('area_id')?.setValue(this.areas[0].id);
+            console.log('🔵 CreateScreenDialog: Form value after setting area:', this.screenForm.value);
+          } else {
+            console.warn('⚠️ CreateScreenDialog: No areas available to select');
+          }
+          
+          // Important: trigger change detection
+          this.cdr.detectChanges();
+          console.log('🔄 CreateScreenDialog: Change detection triggered');
+          
+          // Verify the UI state after change detection
+          setTimeout(() => {
+            console.log('🔍 CreateScreenDialog: Current UI state:', {
+              areasLength: this.areas.length,
+              formValue: this.screenForm.value,
+              isLoading: this.isLoading,
+              areasInitialized: this.areasInitialized
+            });
+            
+            // Log the DOM state
+            const selectElement = document.querySelector('#areaSelect') as HTMLSelectElement;
+            if (selectElement) {
+              console.log('🔍 CreateScreenDialog: Select element:', {
+                options: selectElement.options.length,
+                selectedIndex: selectElement.selectedIndex,
+                value: selectElement.value
+              });
+            } else {
+              console.warn('⚠️ CreateScreenDialog: Select element not found in DOM');
+            }
+          }, 0);
+        },
+        error: (error) => {
+          clearTimeout(loadingTimeout);
+          console.error('❌ CreateScreenDialog: Error loading areas:', error);
+          this.errorMessage = 'Failed to load areas: ' + (error.message || 'Unknown error');
+          this.isLoading = false;
+          this.areasInitialized = true; // Still mark as initialized even on error
+          this.cdr.detectChanges();
+        },
+        complete: () => {
+          clearTimeout(loadingTimeout);
+          console.log('✅ CreateScreenDialog: Areas loading complete');
+          this.isLoading = false;
+          this.areasInitialized = true;
+          this.cdr.detectChanges();
+        }
+      });
+  }
+
+  // Add this method to the CreateScreenDialogComponent to directly query areas
+  // This is a last resort fallback if the regular service methods aren't working
+
+  async loadAreasDirectly(): Promise<void> {
+    try {
+      console.log('🔄 Direct query: Attempting to load areas directly from Supabase');
+      this.isLoading = true;
+      this.cdr.detectChanges();
+      
+      // Try first with user filtering
+      let { data, error } = await supabase
+        .from('areas')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('❌ Direct query: Error fetching areas with user filtering:', error);
+        throw error;
+      }
+      
+      console.log(`✅ Direct query: Found ${data?.length || 0} areas`);
+      
+      // Map to Area objects manually
+      const mappedAreas: Area[] = (data || []).map(item => ({
+        id: item.id,
+        name: item.name || 'Unnamed Area',
+        description: item.description || '',
+        location: item.location || 'Unknown Location',
+        status: item.status || 'inactive',
+        screenCount: item.screen_count || 0,
+        lastUpdated: new Date(item.updated_at || Date.now()),
+        stats: {
+          onlineScreens: 0,
+          totalScreens: 0,
+          activePlaylist: 'No playlist',
+          uptime: '100%',
+          lastUpdated: item.updated_at || new Date().toISOString()
+        },
+        screens: []
+      }));
+      
+      console.log('📋 Direct query: Mapped areas:', mappedAreas);
+      
+      // Update component state
+      this.areas = mappedAreas;
+      this.isLoading = false;
+      this.areasInitialized = true;
+      
+      // Select the first area if available
+      if (this.areas.length > 0) {
+        this.screenForm.get('area_id')?.setValue(this.areas[0].id);
+      }
+      
+      // Update UI
+      this.cdr.detectChanges();
+      console.log('✅ Direct query: Areas loaded directly and UI updated');
+      
+    } catch (err) {
+      console.error('❌ Direct query: Fatal error loading areas directly:', err);
+      this.errorMessage = 'Failed to load areas directly. Please try again.';
+      this.isLoading = false;
+      this.areasInitialized = true;
+      this.cdr.detectChanges();
     }
   }
 }
