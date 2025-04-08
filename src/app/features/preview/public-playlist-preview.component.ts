@@ -1,5 +1,5 @@
 // src/app/features/preview/public-playlist-preview.component.ts
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
@@ -32,25 +32,42 @@ import { supabase } from '../../core/services/supabase.config';
           
           <!-- Video -->
           <video 
+            #videoPlayer
             *ngIf="item.type === 'video'" 
             [src]="item.content.url"
             [style.display]="currentIndex === i ? 'block' : 'none'"
             class="w-full h-full object-contain"
-            autoplay
-            muted
-            (ended)="nextSlide()"
+            [muted]="item.settings.muted ?? true"
+            [loop]="false"
+            (ended)="handleVideoEnded()"
           ></video>
+        </div>
+        
+        <!-- Progress bar at bottom -->
+        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+          <div 
+            class="h-full bg-blue-500 transition-all"
+            [style.width.%]="progressPercentage"
+          ></div>
         </div>
       </div>
     </div>
   `
 })
 export class PublicPlaylistPreviewComponent implements OnInit, OnDestroy {
+  @ViewChild('videoPlayer') videoPlayer?: ElementRef<HTMLVideoElement>;
+  
   loading = true;
   error: string | null = null;
   items: PlaylistItem[] = [];
   currentIndex = 0;
-  slideInterval: any = null;
+  
+  // Timer variables
+  private slideTimer: any = null;
+  private startTime: number = 0;
+  private currentDuration: number = 0;
+  progressPercentage: number = 0;
+  private animationFrameId: number | null = null;
   
   constructor(
     private route: ActivatedRoute,
@@ -62,8 +79,18 @@ export class PublicPlaylistPreviewComponent implements OnInit, OnDestroy {
   }
   
   ngOnDestroy() {
-    if (this.slideInterval) {
-      clearInterval(this.slideInterval);
+    this.clearTimers();
+  }
+  
+  private clearTimers() {
+    if (this.slideTimer) {
+      clearTimeout(this.slideTimer);
+      this.slideTimer = null;
+    }
+    
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
   }
   
@@ -116,7 +143,7 @@ export class PublicPlaylistPreviewComponent implements OnInit, OnDestroy {
       }
       
       this.loading = false;
-      this.startSlideshow();
+      this.showCurrentItem();
       
     } catch (err: any) {
       console.error('Error loading playlist:', err);
@@ -125,30 +152,66 @@ export class PublicPlaylistPreviewComponent implements OnInit, OnDestroy {
     }
   }
   
-  startSlideshow() {
-    console.log('Starting slideshow with', this.items.length, 'items');
+  showCurrentItem() {
+    // Clear any existing timers
+    this.clearTimers();
     
-    // Clear any existing interval
-    if (this.slideInterval) {
-      clearInterval(this.slideInterval);
+    const currentItem = this.items[this.currentIndex];
+    console.log(`Showing item ${this.currentIndex + 1}/${this.items.length}: ${currentItem.name} (${currentItem.duration}s)`);
+    
+    if (currentItem.type === 'video') {
+      // For videos, wait for the video to end (handling through the ended event)
+      setTimeout(() => {
+        if (this.videoPlayer?.nativeElement) {
+          this.videoPlayer.nativeElement.currentTime = 0;
+          this.videoPlayer.nativeElement.play().catch(err => {
+            console.error('Error playing video:', err);
+            // If video fails to play, move to next slide after the defined duration
+            this.startTimerForCurrentItem();
+          });
+        } else {
+          // If video player is not available for some reason, fall back to timer
+          this.startTimerForCurrentItem();
+        }
+      }, 0);
+    } else {
+      // For images and other content, use the defined duration
+      this.startTimerForCurrentItem();
     }
+  }
+  
+  startTimerForCurrentItem() {
+    const currentItem = this.items[this.currentIndex];
+    this.currentDuration = currentItem.duration * 1000; // Convert to milliseconds
+    this.startTime = Date.now();
     
-    // Set interval to change slides
-    this.slideInterval = setInterval(() => {
-      console.log('Auto advancing to next slide');
+    // Set up the timer to move to the next item
+    this.slideTimer = setTimeout(() => {
       this.nextSlide();
-    }, 5000); // Fixed 5 second duration for simplicity
+    }, this.currentDuration);
+    
+    // Start progress bar animation
+    this.updateProgressBar();
+  }
+  
+  updateProgressBar() {
+    const elapsed = Date.now() - this.startTime;
+    this.progressPercentage = Math.min((elapsed / this.currentDuration) * 100, 100);
+    
+    if (this.progressPercentage < 100) {
+      this.animationFrameId = requestAnimationFrame(() => this.updateProgressBar());
+    }
+  }
+  
+  handleVideoEnded() {
+    console.log('Video ended naturally');
+    this.nextSlide();
   }
   
   nextSlide() {
-    console.log('Moving to next slide from', this.currentIndex);
+    this.clearTimers();
     this.currentIndex = (this.currentIndex + 1) % this.items.length;
-    console.log('New index:', this.currentIndex);
-  }
-  
-  prevSlide() {
-    console.log('Moving to previous slide from', this.currentIndex);
-    this.currentIndex = (this.currentIndex - 1 + this.items.length) % this.items.length;
-    console.log('New index:', this.currentIndex);
+    this.progressPercentage = 0;
+    this.showCurrentItem();
   }
 }
