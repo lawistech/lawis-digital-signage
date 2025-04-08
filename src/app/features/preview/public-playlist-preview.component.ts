@@ -43,13 +43,13 @@ import { supabase } from '../../core/services/supabase.config';
           ></video>
         </div>
         
-        <!-- Progress bar at bottom -->
+        <!-- Progress bar at bottom
         <div class="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
           <div 
             class="h-full bg-blue-500 transition-all"
             [style.width.%]="progressPercentage"
           ></div>
-        </div>
+        </div> -->
       </div>
     </div>
   `
