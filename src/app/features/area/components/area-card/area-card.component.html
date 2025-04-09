@@ -12,48 +12,6 @@
         ></div>
         <h3 class="text-lg font-medium text-gray-900">{{ area.name }}</h3>
       </div>
-
-      <!-- Actions Dropdown -->
-      <div class="relative">
-        <button
-          (click)="toggleMenu($event)"
-          class="p-1.5 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-50"
-          title="More options"
-        >
-          <span class="material-icons text-lg">more_vert</span>
-        </button>
-
-        <!-- Dropdown Menu -->
-        @if (showMenu) {
-          <div 
-            class="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg border border-gray-100 py-1 z-10"
-          >
-            <button
-              (click)="onEdit($event)"
-              class="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-            >
-              <span class="material-icons text-lg mr-2 text-gray-400">edit</span>
-              Edit Area
-            </button>
-            <button
-              (click)="onToggleStatus($event)"
-              class="w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-            >
-              <span class="material-icons text-lg mr-2 text-gray-400">
-                {{ area.status === 'active' ? 'pause_circle' : 'play_circle' }}
-              </span>
-              {{ area.status === 'active' ? 'Deactivate' : 'Activate' }}
-            </button>
-            <button
-              (click)="onDelete($event)"
-              class="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
-            >
-              <span class="material-icons text-lg mr-2">delete</span>
-              Delete Area
-            </button>
-          </div>
-        }
-      </div>
     </div>
 
     <!-- Location -->

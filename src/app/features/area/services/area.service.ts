@@ -20,8 +20,6 @@ export class AreaService {
   /**
    * Get all areas with optimized caching and refresh strategy
    */
-  // Enhanced debugging for AreaService getAreas method
-
   getAreas(forceRefresh = false): Observable<Area[]> {
     console.log('🔍 AreaService: getAreas called, forceRefresh =', forceRefresh);
     
@@ -163,10 +161,6 @@ export class AreaService {
   /**
    * Create a new area with optimistic UI update support
    */
-  // Replace the createArea method in AreaService to properly handle the nested data structure
-
-  // Fixed version of createArea method with proper type safety for screenIds
-
   createArea(data: CreateAreaDto | { area: CreateAreaDto, screenIds?: string[] }): Observable<Area> {
     const userId = this.authService.getCurrentUserId();
     
@@ -182,8 +176,8 @@ export class AreaService {
     
     // Handle screenIds safely - ensure it's an array
     const screenIds: string[] = 'screenIds' in data ? 
-                                (data.screenIds || []) : 
-                                ('area' in data && data.screenIds ? data.screenIds : []);
+                              (data.screenIds || []) : 
+                              ('area' in data && data.screenIds ? data.screenIds : []);
     
     console.log('📝 AreaService: Processed area data:', { areaData, screenIds, userId });
 
@@ -447,9 +441,6 @@ export class AreaService {
   private mapAreasFromSupabase(data: any[]): Area[] {
     return data.map(area => this.mapAreaFromSupabase(area));
   }
-
-
-  // Add this to your AreaService to help debug data mapping issues
 
   private mapAreaFromSupabase(data: any): Area {
     console.log('🔍 AreaService: Mapping area from Supabase data:', data);

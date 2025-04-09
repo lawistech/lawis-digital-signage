@@ -23,13 +23,32 @@ export class LayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   private resizeListener: () => void;
 
-  navigationItems: NavigationItem[] = [
+  // Base navigation items without the conditional ones
+  private baseNavigationItems: NavigationItem[] = [
     { path: '/areas', label: 'Areas', icon: 'dashboard', notifications: 0 },
     { path: '/screens', label: 'Screens', icon: 'monitor', notifications: 0 },
     { path: '/playlists', label: 'Playlists', icon: 'playlist_play', notifications: 0 },
-    { path: '/sumups', label: 'Sumups', icon: 'view_carousel', notifications: 0 },
     { path: '/media', label: 'Media', icon: 'movie', notifications: 0 },
   ];
+
+  // Calculated navigation items property based on user email
+  get navigationItems(): NavigationItem[] {
+    // Create a copy of the base items to work with
+    const items = [...this.baseNavigationItems];
+    
+    // Add sumups only for the specific admin email
+    if (this.currentUser?.email === 'admin1@resay.co.uk') {
+      // Insert at the appropriate position (after playlists)
+      items.splice(3, 0, { 
+        path: '/sumups', 
+        label: 'Sumups', 
+        icon: 'view_carousel', 
+        notifications: 0 
+      });
+    }
+    
+    return items;
+  }
 
   constructor(
     private authService: SupabaseAuthService,
@@ -113,7 +132,6 @@ export class LayoutComponent implements OnInit, OnDestroy {
     return displayName ? displayName.charAt(0).toUpperCase() : '?';
   }
   
-  // Fixed isActiveRoute method to properly handle profile and plan routes
   isActiveRoute(path: string): boolean {
     // For the specific case of profile links
     if (path === '/profile') {
@@ -167,16 +185,16 @@ export class LayoutComponent implements OnInit, OnDestroy {
   
   // For demo purposes only - in real app, this would be replaced with actual notifications
   private updateMockNotifications(): void {
-    // Reset all notifications
-    this.navigationItems.forEach(item => item.notifications = 0);
+    // Reset all notifications for base items
+    this.baseNavigationItems.forEach(item => item.notifications = 0);
     
     // Add some mock notifications based on the route
     if (this.currentRoute.includes('areas')) {
-      this.navigationItems.find(item => item.path === '/screens')!.notifications = 2;
+      const screensItem = this.baseNavigationItems.find(item => item.path === '/screens');
+      if (screensItem) screensItem.notifications = 2;
     } else if (this.currentRoute.includes('screens')) {
-      this.navigationItems.find(item => item.path === '/playlists')!.notifications = 1;
-    } else if (this.currentRoute.includes('playlists')) {
-      this.navigationItems.find(item => item.path === '/sumups')!.notifications = 1;
+      const playlistsItem = this.baseNavigationItems.find(item => item.path === '/playlists');
+      if (playlistsItem) playlistsItem.notifications = 1;
     }
   }
 }

@@ -1,11 +1,11 @@
-// src/app/features/areas/components/area-details/area-details.component.ts
+// src/app/features/area/components/area-details/area-details.component.ts
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { Subject, combineLatest, of, from } from 'rxjs';
+import { Subject, combineLatest, of } from 'rxjs';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { switchMap, takeUntil, map, catchError, finalize, tap } from 'rxjs/operators';
+import { switchMap, takeUntil, map, catchError, finalize } from 'rxjs/operators';
 
 import { Area } from '../../../../models/area.model';
 import { Screen } from '../../../../models/screen.model';
@@ -76,41 +76,40 @@ export class AreaDetailsComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = null;
     
-    const id = this.route.paramMap.pipe(
+    this.route.paramMap.pipe(
       takeUntil(this.destroy$),
-      map(params => params.get('id'))
-    );
-    
-    id.subscribe(areaId => {
-      if (!areaId) {
-        this.error = 'No area ID provided';
-        this.loading = false;
-        return;
-      }
-      
-      this.areaId = areaId;
-      
-      // Load area details
-      this.areaService.getAreaById(areaId).pipe(
-        catchError(error => {
-          console.error('Error loading area:', error);
-          this.error = 'Failed to load area details. Please try again.';
+      map(params => params.get('id')),
+      switchMap(areaId => {
+        if (!areaId) {
+          this.error = 'No area ID provided';
+          this.loading = false;
           return of(null);
-        })
-      ).subscribe(area => {
-        this.area = area;
-        
-        // If we successfully loaded the area, get screens
-        if (area) {
-          this.loadScreens(areaId);
-          this.loadPlaylists(areaId);
-          this.setupRealtimeSubscription();
-        } else if (!this.error) {
-          this.error = 'Area not found';
         }
         
-        this.loading = false;
-      });
+        this.areaId = areaId;
+        
+        // Load area details
+        return this.areaService.getAreaById(areaId).pipe(
+          catchError(error => {
+            console.error('Error loading area:', error);
+            this.error = 'Failed to load area details. Please try again.';
+            return of(null);
+          })
+        );
+      })
+    ).subscribe(area => {
+      this.area = area;
+      
+      // If we successfully loaded the area, get screens and playlists
+      if (area && this.areaId) {
+        this.loadScreens(this.areaId);
+        this.loadPlaylists(this.areaId);
+        this.setupRealtimeSubscription();
+      } else if (!this.error) {
+        this.error = 'Area not found';
+      }
+      
+      this.loading = false;
     });
   }
   
@@ -203,7 +202,20 @@ export class AreaDetailsComponent implements OnInit, OnDestroy {
   }
 
   openAddScreenDialog(): void {
-    this.showAddScreenDialog = true;
+    // Load available screens that don't have an area assigned
+    this.screenService.getScreens().pipe(
+      map(screens => screens.filter(screen => !screen.area_id || screen.area_id === '')),
+      takeUntil(this.destroy$)
+    ).subscribe(availableScreens => {
+      if (availableScreens.length === 0) {
+        this.error = 'No unassigned screens available to add. Create a new screen first.';
+        setTimeout(() => this.error = null, 5000);
+        return;
+      }
+      
+      // Now that we have screens, show the dialog
+      this.showAddScreenDialog = true;
+    });
   }
 
   closeAddScreenDialog(refreshData: boolean = false): void {
@@ -211,6 +223,45 @@ export class AreaDetailsComponent implements OnInit, OnDestroy {
     if (refreshData) {
       this.refreshData();
     }
+  }
+
+  // Handle adding screens to the area
+  addScreensToArea(screenIds: string[]): void {
+    if (!this.areaId || !screenIds || screenIds.length === 0) return;
+    
+    // Show loading
+    this.loading = true;
+    
+    // Ensure areaId is not null (TypeScript type safety)
+    const areaId: string = this.areaId as string;
+    
+    // Log for debugging
+    console.log(`Attempting to assign ${screenIds.length} screens to area ${areaId}`);
+    
+    // Create an array of observables for each screen update
+    const updateObservables = screenIds.map(screenId => {
+      console.log(`Updating screen ${screenId} with area_id ${areaId}`);
+      return this.screenService.updateScreen(screenId, { area_id: areaId });
+    });
+    
+    // Use combineLatest to wait for all updates to complete
+    combineLatest(updateObservables).pipe(
+      takeUntil(this.destroy$),
+      finalize(() => {
+        this.loading = false;
+        this.closeAddScreenDialog(true);
+      })
+    ).subscribe({
+      next: (results) => {
+        // Update was successful
+        console.log(`Successfully updated ${results.length} screens`);
+        this.error = null;
+      },
+      error: (error) => {
+        console.error('Error adding screens to area:', error);
+        this.error = 'Failed to add screens to area. Please try again.';
+      }
+    });
   }
 
   editScreen(screen: Screen): void {
@@ -239,26 +290,5 @@ export class AreaDetailsComponent implements OnInit, OnDestroy {
         screen.status.toLowerCase().includes(query) ||
         (screen.tags && screen.tags.some(tag => tag.toLowerCase().includes(query)))
     );
-  }
-
-  addScreenToArea(screenId: string): void {
-    if (!this.areaId) return;
-    
-    this.screenService.updateScreen(screenId, { area_id: this.areaId }).pipe(
-      takeUntil(this.destroy$),
-      catchError(error => {
-        console.error('Error adding screen to area:', error);
-        this.error = 'Failed to add screen to area. Please try again.';
-        return of(null);
-      })
-    ).subscribe(updatedScreen => {
-      if (updatedScreen) {
-        // Check if screen already exists in our list
-        if (!this.screens.some(s => s.id === updatedScreen.id)) {
-          this.screens = [...this.screens, updatedScreen];
-          this.updateStats();
-        }
-      }
-    });
   }
 }
